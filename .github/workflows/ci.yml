@@ -15,3 +15,11 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
+      - name: Runtime smoke test
+        run: |
+          npm run start > /tmp/squeeze-race.log 2>&1 &
+          pid=$!
+          trap 'kill $pid || true' EXIT
+          for i in {1..30}; do curl -fsS http://127.0.0.1:3000/api/health && exit 0; sleep 1; done
+          cat /tmp/squeeze-race.log
+          exit 1
