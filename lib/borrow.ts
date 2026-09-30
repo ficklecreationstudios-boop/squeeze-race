@@ -1,13 +1,13 @@
 type Borrow={fee:number|null;available:number|null;observedAt:number|null;source:string;freshness:"LIVE"|"SNAPSHOT"|"UNAVAILABLE"};
 function parseCompact(v:string){const n=Number(v.replace(/[$,%]/g,""));if(!Number.isFinite(n))return null;const u=v.trim().toUpperCase();return n*(u.endsWith("M")?1_000_000:u.endsWith("K")?1_000:1)}
-function cleanHtml(s:string){return s.replace(/<script[\\s\\S]*?<\\/script>/gi," ").replace(/<style[\\s\\S]*?<\\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\\s+/g," ").trim()}
+function cleanHtml(s:string){return s.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim()}
 async function pageFallback(ticker:string):Promise<Borrow>{
   const r=await fetch("https://www.iborrowdesk.com/report/"+encodeURIComponent(ticker.toUpperCase()),{headers:{"accept":"text/html","User-Agent":"Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)"},cache:"no-store"});
   if(!r.ok)throw new Error("IBorrowDesk page HTTP "+r.status);
   const text=cleanHtml(await r.text());
-  const feeMatch=text.match(/Borrow fee\\s+([0-9]+(?:\\.[0-9]+)?%)/i);
-  const availMatch=text.match(/Shares available\\s+([0-9]+(?:\\.[0-9]+)?[KM]?)/i);
-  const updated=text.match(/Updated\\s+([A-Z][a-z]{2}\\s+\\d{1,2},\\s+\\d{4},\\s+\\d{1,2}:\\d{2}\\s+(?:AM|PM))/i);
+  const feeMatch=text.match(/Borrow fee\s+([0-9]+(?:\.[0-9]+)?%)/i);
+  const availMatch=text.match(/Shares available\s+([0-9]+(?:\.[0-9]+)?[KM]?)/i);
+  const updated=text.match(/Updated\s+([A-Z][a-z]{2}\s+\d{1,2},\s+\d{4},\s+\d{1,2}:\d{2}\s+(?:AM|PM))/i);
   const fee=feeMatch?parseCompact(feeMatch[1]):null,available=availMatch?parseCompact(availMatch[1]):null;
   if(fee===null&&available===null)throw new Error("IBorrowDesk page values missing");
   const ts=updated?Date.parse(updated[1]):null;
