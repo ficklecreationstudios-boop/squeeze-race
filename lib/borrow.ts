@@ -1,10 +1,11 @@
 type Borrow={fee:number|null;available:number|null;observedAt:number|null;source:string;freshness:"LIVE"|"SNAPSHOT"|"LAGGED"|"UNAVAILABLE"};
 function parseCompact(v:string){const u=v.trim().toUpperCase().replace(/[$,%]/g,""),m=u.match(/^([0-9,.]+)\s*([KM])?$/);if(!m)return null;const n=Number(m[1].replace(/,/g,""));if(!Number.isFinite(n))return null;return n*(m[2]==="M"?1_000_000:m[2]==="K"?1_000:1)}
 function cleanHtml(s:string){return s.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim()}
-const FETCH_TIMEOUT_MS=8000;
+const FETCH_TIMEOUT_MS=8000;const CHART_MAX_CONCURRENCY=4;let chartActive=0;const chartWaiters:Array<()=>void>=[];
+async function withChartSlot<T>(fn:()=>Promise<T>):Promise<T>{if(chartActive>=CHART_MAX_CONCURRENCY)await new Promise<void>(resolve=>chartWaiters.push(resolve));chartActive++;try{return await fn()}finally{chartActive--;chartWaiters.shift()?.()}}
 async function timedFetch(input:string,init:RequestInit={}){const c=new AbortController(),timer=setTimeout(()=>c.abort(),FETCH_TIMEOUT_MS);try{return await fetch(input,{...init,signal:c.signal})}finally{clearTimeout(timer)}}
 async function chartExchangeFallback(ticker:string,preferredExchange?:string|null):Promise<Borrow>{
-  let last:unknown=null;
+  return withChartSlot(async()=>{let last:unknown=null;
   const exchanges=["nasdaq","nyse","amex"];const ordered=preferredExchange?[preferredExchange.toLowerCase(),...exchanges.filter(e=>e!==preferredExchange.toLowerCase())]:exchanges;
   for(const exchange of ordered){
     try{
@@ -20,6 +21,7 @@ async function chartExchangeFallback(ticker:string,preferredExchange?:string|nul
     }catch(e){last=e}
   }
   throw last||new Error("ChartExchange borrow unavailable");
+  });
 }
 async function pageFallback(ticker:string):Promise<Borrow>{
   const hosts=["https://www.iborrowdesk.com/report/","https://iborrowdesk.com/report/"];
@@ -58,8 +60,8 @@ export async function getIBorrowDesk(ticker:string,exchange?:string|null):Promis
     }catch(e){last=e}}
     throw last||new Error("IBorrowDesk API unavailable");
   }catch{
-    try{return await pageFallback(ticker)}catch{
-      try{return await chartExchangeFallback(ticker,exchange)}catch{
+    try{return await chartExchangeFallback(ticker,exchange)}catch{
+      try{return await pageFallback(ticker)}catch{
         return{fee:null,available:null,observedAt:null,source:"Borrow data unavailable",freshness:"UNAVAILABLE"}
       }
     }
