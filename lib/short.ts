@@ -12,14 +12,14 @@ export async function getShortBundle(ticker:string):Promise<ShortBundle>{
     ftd:empty("SEC CNS fails-to-deliver data"),svd:empty("FINRA Reg SHO Daily Short Sale Volume"),
     float:empty("TradingView public scanner"),marketCap:empty("TradingView public scanner")
   }};
-  const [si,sv,tv,borrow,ftd]=await Promise.all([
+  const [si,sv,tv,ftd]=await Promise.all([
     getFinraShortInterest(ticker).catch(()=>null),
     getFinraShortVolume(ticker).catch(()=>null),
     getTradingViewFundamentals([ticker]).catch(()=>new Map()),
-    getIBorrowDesk(ticker).catch(()=>null),
     getFtd(ticker).catch(()=>null)
   ]);
   const f=tv.get(ticker);
+  const borrow=await getIBorrowDesk(ticker,f?.exchange??null).catch(()=>null);
   if(si){
     out.dtc=si.dtc;
     out.sources.dtc={value:si.dtc,source:si.source+" (recomputed from current short / FINRA ADV)",observedAt:si.observedAt,freshness:si.freshness};
