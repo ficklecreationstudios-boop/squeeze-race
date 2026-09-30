@@ -24,14 +24,19 @@ async function pageFallback(ticker:string):Promise<Borrow>{
 }
 export async function getIBorrowDesk(ticker:string):Promise<Borrow>{
   try{
-    const r=await fetch("https://iborrowdesk.com/api/ticker/"+encodeURIComponent(ticker.toUpperCase()),{headers:{"accept":"application/json","User-Agent":"Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)"},cache:"no-store"});
-    if(!r.ok)throw new Error("IBorrowDesk API HTTP "+r.status);
-    const j=await r.json() as {real_time?:Array<Record<string,any>>;daily?:Array<Record<string,any>>};
+    const hosts=["https://iborrowdesk.com/api/ticker/","https://www.iborrowdesk.com/api/ticker/"];
+    let last:unknown=null;
+    for(const host of hosts){try{
+      const r=await fetch(host+encodeURIComponent(ticker.toUpperCase()),{headers:{"accept":"application/json","accept-encoding":"gzip, deflate, br","User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36 Squeeze-Race/1.0"},cache:"no-store"});
+      if(!r.ok)throw new Error("IBorrowDesk API HTTP "+r.status);
+      const j=await r.json() as {real_time?:Array<Record<string,any>>;daily?:Array<Record<string,any>>};
     const rows=[...(j.real_time||[]),...(j.daily||[])].filter(x=>x&&(Number.isFinite(Number(x.fee))||Number.isFinite(Number(x.available))));
     if(!rows.length)throw new Error("IBorrowDesk API empty");
     rows.sort((a,b)=>new Date(String(b.date||b.reported||0)).getTime()-new Date(String(a.date||a.reported||0)).getTime());
     const x=rows[0],fee=Number(x.fee),available=Number(x.available),ts=Date.parse(String(x.date||x.reported||""));
     return{fee:Number.isFinite(fee)?fee:null,available:Number.isFinite(available)?available:null,observedAt:Number.isFinite(ts)?ts:null,source:"IBorrowDesk / Interactive Brokers public stock-loan feed",freshness:"LIVE"};
+    }catch(e){last=e}}
+    throw last||new Error("IBorrowDesk API unavailable");
   }catch{
     try{return await pageFallback(ticker)}catch{
       return{fee:null,available:null,observedAt:null,source:"IBorrowDesk / Interactive Brokers public stock-loan feed",freshness:"UNAVAILABLE"}
