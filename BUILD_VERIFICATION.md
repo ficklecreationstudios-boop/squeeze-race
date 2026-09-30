@@ -1,1 +1,1 @@
-Temporary CI verification marker. Remove after CI verification.
+Temporary CI verification marker after nullable FTD and patched Next.js fixes. Remove after verification.
