@@ -13,6 +13,7 @@ async function recentFiles(){
   return files.slice(0,12);
 }
 async function load(url:string):Promise<Map<string,Ftd>>{
+  let lastError:unknown=null;
   const candidates=[url,url.replace("https://dcm.sec.gov/","https://www.sec.gov/")];
   for(const candidate of candidates){
     try{
