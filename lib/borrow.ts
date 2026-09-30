@@ -2,7 +2,7 @@ type Borrow={fee:number|null;available:number|null;observedAt:number|null;source
 function parseCompact(v:string){const n=Number(v.replace(/[$,%]/g,""));if(!Number.isFinite(n))return null;const u=v.trim().toUpperCase();return n*(u.endsWith("M")?1_000_000:u.endsWith("K")?1_000:1)}
 function cleanHtml(s:string){return s.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim()}
 async function pageFallback(ticker:string):Promise<Borrow>{
-  const hosts=["https://www.iborrowdesk.com/report/","https://www.cjmochrie.com/report/"];
+  const hosts=["https://www.iborrowdesk.com/report/","https://iborrowdesk.com/report/"];
   let last:unknown=null;
   for(const host of hosts){
    try{

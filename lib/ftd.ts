@@ -1,15 +1,26 @@
 import {unzipSync} from "fflate";
 type Ftd={shares:number|null;date:string;observedAt:number;source:string;freshness:"SNAPSHOT"};
 const cache=new Map<string,{at:number;rows:Map<string,Ftd>}>();
+let inflight:Promise<Map<string,Ftd>>|null=null;
 const SEC_UA="Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)";
 function ymd(d:Date){return d.toISOString().slice(0,10)}
 async function recentFiles(){
-  const r=await fetch("https://catalog.data.gov/api/3/action/package_show?id=fails-to-deliver-data",{headers:{"accept":"application/json","User-Agent":SEC_UA},cache:"no-store"});
-  if(!r.ok)throw new Error("Data.gov FTD catalog HTTP "+r.status);
-  const j=await r.json() as {result?:{resources?:Array<{url?:string}>}};
-  const files=(j.result?.resources||[]).map(x=>String(x.url||"")).filter(url=>url.toLowerCase().endsWith(".zip")&&/cnsfails\d{6}[ab]\.zip/i.test(url));
-  files.sort((a,b)=>b.localeCompare(a));
-  return files.slice(0,12);
+  const matches=(urls:string[])=>urls.filter(url=>/cnsfails\\d{6}[ab]\\.zip/i.test(url)).filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>b.localeCompare(a)).slice(0,12);
+  try{
+    const r=await fetch("https://catalog.data.gov/api/3/action/package_show?id=fails-to-deliver-data",{headers:{"accept":"application/json","User-Agent":SEC_UA},cache:"no-store"});
+    if(r.ok){
+      const j=await r.json() as {result?:{resources?:Array<{url?:string}>}};
+      const files=matches((j.result?.resources||[]).map(x=>String(x.url||"")));
+      if(files.length)return files;
+    }
+  }catch{}
+  const r=await fetch("https://www.sec.gov/data-research/sec-markets-data/fails-deliver-data",{headers:{"accept":"text/html","User-Agent":SEC_UA},cache:"no-store"});
+  if(!r.ok)throw new Error("SEC FTD index HTTP "+r.status);
+  const html=await r.text();
+  const urls=(html.match(new RegExp("https?://[^\\\"' \\t\\r\\n<>]+cnsfails\\\\d{6}[ab]\\\\.zip","gi"))||[]);
+  const files=matches(urls);
+  if(!files.length)throw new Error("SEC FTD index contained no ZIP resources");
+  return files;
 }
 async function load(url:string):Promise<Map<string,Ftd>>{
   let lastError:unknown=null;
@@ -37,13 +48,18 @@ async function load(url:string):Promise<Map<string,Ftd>>{
   }
   throw lastError||new Error("SEC FTD unavailable");
 }
-export async function getFtd(ticker:string){
-  const key=ymd(new Date()),cached=cache.get(key);
-  if(cached&&Date.now()-cached.at<1800000)return cached.rows.get(ticker.toUpperCase())||null;
+async function buildRows(){
   const merged=new Map<string,Ftd>();
   for(const file of await recentFiles()){
     try{const rows=await load(file);for(const [k,v] of rows){const old=merged.get(k);if(!old||v.date>old.date)merged.set(k,v)}}catch{}
   }
-  cache.set(key,{at:Date.now(),rows:merged});
-  return merged.get(ticker.toUpperCase())||null;
+  return merged;
+}
+export async function getFtd(ticker:string){
+  const key=ymd(new Date()),cached=cache.get(key);
+  if(cached&&Date.now()-cached.at<1800000)return cached.rows.get(ticker.toUpperCase())||null;
+  if(!inflight)inflight=buildRows().finally(()=>{inflight=null});
+  const rows=await inflight;
+  cache.set(key,{at:Date.now(),rows});
+  return rows.get(ticker.toUpperCase())||null;
 }
