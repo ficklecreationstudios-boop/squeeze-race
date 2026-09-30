@@ -1,6 +1,23 @@
 type Borrow={fee:number|null;available:number|null;observedAt:number|null;source:string;freshness:"LIVE"|"SNAPSHOT"|"LAGGED"|"UNAVAILABLE"};
 function parseCompact(v:string){const n=Number(v.replace(/[$,%]/g,""));if(!Number.isFinite(n))return null;const u=v.trim().toUpperCase();return n*(u.endsWith("M")?1_000_000:u.endsWith("K")?1_000:1)}
 function cleanHtml(s:string){return s.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim()}
+async function chartExchangeFallback(ticker:string):Promise<Borrow>{
+  let last:unknown=null;
+  for(const exchange of ["nasdaq","nyse","amex"]){
+    try{
+      const r=await fetch("https://chartexchange.com/symbol/"+exchange+"-"+encodeURIComponent(ticker.toLowerCase())+"/borrow-fee/",{headers:{"accept":"text/html","User-Agent":"Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)"},cache:"no-store"});
+      if(!r.ok)throw new Error("ChartExchange HTTP "+r.status);
+      const text=cleanHtml(await r.text());
+      const m=text.match(/As of (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} (?:AM|PM) EDT, there were ([0-9,.]+(?:[KM])?) shares available with a fee of ([0-9,.]+)%/i);
+      if(!m)throw new Error("ChartExchange borrow values missing");
+      const ts=Date.parse(m[1]+" "+new Date().getFullYear().toString());
+      const observed=Number.isFinite(ts)?ts:Date.now();
+      const age=Date.now()-observed;
+      return{fee:Number(m[3].replace(/,/g,"")),available:parseCompact(m[2]),observedAt:observed,source:"ChartExchange / Interactive Brokers stock-loan feed",freshness:age<=45*60*1000?"LIVE":age<=24*60*60*1000?"SNAPSHOT":"LAGGED"};
+    }catch(e){last=e}
+  }
+  throw last||new Error("ChartExchange borrow unavailable");
+}
 async function pageFallback(ticker:string):Promise<Borrow>{
   const hosts=["https://www.iborrowdesk.com/report/","https://iborrowdesk.com/report/"];
   let last:unknown=null;
@@ -39,7 +56,9 @@ export async function getIBorrowDesk(ticker:string):Promise<Borrow>{
     throw last||new Error("IBorrowDesk API unavailable");
   }catch{
     try{return await pageFallback(ticker)}catch{
-      return{fee:null,available:null,observedAt:null,source:"IBorrowDesk / Interactive Brokers public stock-loan feed",freshness:"UNAVAILABLE"}
+      try{return await chartExchangeFallback(ticker)}catch{
+        return{fee:null,available:null,observedAt:null,source:"Borrow data unavailable",freshness:"UNAVAILABLE"}
+      }
     }
   }
 }
