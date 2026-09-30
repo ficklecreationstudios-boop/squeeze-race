@@ -3,19 +3,20 @@ type Ftd={shares:number|null;date:string;observedAt:number;source:string;freshne
 const cache=new Map<string,{at:number;rows:Map<string,Ftd>}>();
 const inflight=new Map<string,Promise<Map<string,Ftd>>>();
 const fallbackCache=new Map<string,{at:number;row:Ftd|null}>();
+let lastFtdError:string|null=null;
 const SEC_UA="Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)";
 const INDEX="https://www.sec.gov/data-research/sec-markets-data/fails-deliver-data";
 const MAX_FILE=60_000_000;
 
 async function recentFiles():Promise<string[]>{
   const r=await fetch(INDEX,{headers:{"accept":"text/html","User-Agent":SEC_UA},cache:"no-store"});
-  if(!r.ok)throw new Error("SEC FTD index HTTP "+r.status);
+  if(!r.ok){lastFtdError="index_http_"+r.status;throw new Error(lastFtdError)}
   const html=await r.text(),out:string[]=[];
   for(const m of html.matchAll(/href="([^"]*cnsfails(\d{6}[ab])\.zip)"/gi)){
     const u=m[1].startsWith("http")?m[1]:"https://www.sec.gov"+m[1];
     if(!out.includes(u))out.push(u);
   }
-  if(!out.length)throw new Error("SEC FTD index exposed no ZIP resources");
+  if(!out.length){lastFtdError="index_no_zip_links";throw new Error(lastFtdError)}
   return out.sort((a,b)=>b.localeCompare(a)).slice(0,12);
 }
 function isoDate(v:string){const s=v.trim();return/^\d{8}$/.test(s)?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:s}
@@ -79,7 +80,7 @@ async function pipeworxFallback(ticker:string):Promise<Ftd|null>{
     const r=await fetch("https://gateway.pipeworx.io/v1/tools/ftd_security",{method:"POST",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({symbol:key,periods:6}),cache:"no-store"});
     if(!r.ok)throw new Error("keyless FTD fallback HTTP "+r.status);
     const h=findFtdValue(await r.json());fallbackCache.set(key,{at:Date.now(),row:h});return h;
-  }catch{fallbackCache.set(key,{at:Date.now(),row:null});return null}
+  }catch(e){lastFtdError=e instanceof Error?e.message:"fallback_failed";fallbackCache.set(key,{at:Date.now(),row:null});return null}
 }
 async function buildRows(){const merged=new Map<string,Ftd>();for(const file of await recentFiles()){try{const rows=await load(file);for(const [k,v] of rows){const old=merged.get(k);if(!old||v.date>old.date)merged.set(k,v)}}catch{}}return merged}
 
@@ -89,3 +90,4 @@ export async function getFtd(ticker:string){
   let p=inflight.get(cacheKey);if(!p){p=buildRows().finally(()=>inflight.delete(cacheKey));inflight.set(cacheKey,p)}
   const rows=await p;cache.set(cacheKey,{at:Date.now(),rows});return rows.get(key)||await pipeworxFallback(key);
 }
+export function getFtdDiagnostics(){return{lastError:lastFtdError,source:"SEC CNS fails-to-deliver primary + keyless fallback"}}
