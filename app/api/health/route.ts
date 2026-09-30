@@ -1,0 +1,1 @@
+import {NextResponse} from "next/server";export const dynamic="force-dynamic";export async function GET(){return NextResponse.json({ok:true,pricePlane:process.env.POLYGON_API_KEY?"configured":"missing",shortPlane:process.env.FINTEL_API_KEY?"configured":"missing",timestamp:Date.now()})}
