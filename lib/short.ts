@@ -36,7 +36,7 @@ export async function getShortBundle(ticker:string):Promise<ShortBundle>{
     out.sources.ctb={value:borrow.fee,source:borrow.source,observedAt:borrow.observedAt,freshness:borrow.freshness};
     out.sources.avail={value:borrow.available,source:borrow.source,observedAt:borrow.observedAt,freshness:borrow.freshness};
   }
-  if(ftd&&f?.float&&f.float>0){
+  if(ftd&&ftd.shares!==null&&f?.float&&f.float>0){
     out.ftd=ftd.shares/f.float*100;
     out.sources.ftd={value:out.ftd,source:ftd.source+" ("+Math.round(ftd.shares).toLocaleString()+" shares on "+ftd.date+")",observedAt:ftd.observedAt,freshness:ftd.freshness};
   }
