@@ -1,16 +1,17 @@
 type Borrow={fee:number|null;available:number|null;observedAt:number|null;source:string;freshness:"LIVE"|"SNAPSHOT"|"LAGGED"|"UNAVAILABLE"};
-function parseCompact(v:string){const n=Number(v.replace(/[$,%]/g,""));if(!Number.isFinite(n))return null;const u=v.trim().toUpperCase();return n*(u.endsWith("M")?1_000_000:u.endsWith("K")?1_000:1)}
+function parseCompact(v:string){const u=v.trim().toUpperCase().replace(/[$,%]/g,""),m=u.match(/^([0-9,.]+)\s*([KM])?$/);if(!m)return null;const n=Number(m[1].replace(/,/g,""));if(!Number.isFinite(n))return null;return n*(m[2]==="M"?1_000_000:m[2]==="K"?1_000:1)}
 function cleanHtml(s:string){return s.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim()}
 const FETCH_TIMEOUT_MS=8000;
 async function timedFetch(input:string,init:RequestInit={}){const c=new AbortController(),timer=setTimeout(()=>c.abort(),FETCH_TIMEOUT_MS);try{return await fetch(input,{...init,signal:c.signal})}finally{clearTimeout(timer)}}
 async function chartExchangeFallback(ticker:string,preferredExchange?:string|null):Promise<Borrow>{
   let last:unknown=null;
-  for(const exchange of (preferredExchange?[preferredExchange.toLowerCase()]:["nasdaq","nyse","amex"])){
+  const exchanges=["nasdaq","nyse","amex"];const ordered=preferredExchange?[preferredExchange.toLowerCase(),...exchanges.filter(e=>e!==preferredExchange.toLowerCase())]:exchanges;
+  for(const exchange of ordered){
     try{
       const r=await timedFetch("https://chartexchange.com/symbol/"+exchange+"-"+encodeURIComponent(ticker.toLowerCase())+"/borrow-fee/",{headers:{"accept":"text/html","User-Agent":"Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)"},cache:"no-store"});
       if(!r.ok)throw new Error("ChartExchange HTTP "+r.status);
       const text=cleanHtml(await r.text());
-      const m=text.match(/As of ([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} (?:AM|PM) EDT), there were ([0-9,.]+(?:[KM])?) shares available with a fee of ([0-9,.]+)%/i);
+      const m=text.match(/As of ([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} (?:AM|PM) (?:EDT|EST)), there were ([0-9,.]+(?:[KM])?) shares available with a fee of ([0-9,.]+)%/i);
       if(!m)throw new Error("ChartExchange borrow values missing");
       const ts=Date.parse(m[1]);
       const observed=Number.isFinite(ts)?ts:Date.now();
