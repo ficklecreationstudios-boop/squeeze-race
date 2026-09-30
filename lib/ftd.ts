@@ -5,7 +5,7 @@ const SEC_UA="Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/s
 function ymd(d:Date){return d.toISOString().slice(0,10)}
 function halfFiles(now=new Date()){
   const out:string[]=[];
-  for(let i=0;i<4;i++){
+  for(let i=0;i<6;i++){
     const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-i,1));
     const ym=String(d.getUTCFullYear())+String(d.getUTCMonth()+1).padStart(2,"0");
     out.push("cnsfails"+ym+"a.zip","cnsfails"+ym+"b.zip");
@@ -13,7 +13,7 @@ function halfFiles(now=new Date()){
   return out;
 }
 async function load(file:string):Promise<Map<string,Ftd>>{
-  const prefixes=["https://www.sec.gov/files/data/fails-deliver-data/","https://www.sec.gov/files/data/other/fails-deliver-data/"];
+  const prefixes=["https://dcm.sec.gov/files/data/fails-deliver-data/","https://dcm.sec.gov/files/data/other/fails-deliver-data/","https://www.sec.gov/files/data/fails-deliver-data/","https://www.sec.gov/files/data/other/fails-deliver-data/"];
   let lastError:unknown=null;
   for(const prefix of prefixes){
     try{
