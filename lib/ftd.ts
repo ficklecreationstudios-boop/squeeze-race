@@ -17,7 +17,7 @@ async function recentFiles():Promise<string[]>{
     if(!out.includes(u))out.push(u);
   }
   if(!out.length){lastFtdError="index_no_zip_links";throw new Error(lastFtdError)}
-  return out.sort((a,b)=>b.localeCompare(a)).slice(0,12);
+  return out.sort((a,b)=>b.localeCompare(a)).slice(0,6);
 }
 function isoDate(v:string){const s=v.trim();return/^\d{8}$/.test(s)?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:s}
 
@@ -82,7 +82,13 @@ async function pipeworxFallback(ticker:string):Promise<Ftd|null>{
     const h=findFtdValue(await r.json());fallbackCache.set(key,{at:Date.now(),row:h});return h;
   }catch(e){lastFtdError=e instanceof Error?e.message:"fallback_failed";fallbackCache.set(key,{at:Date.now(),row:null});return null}
 }
-async function buildRows(){const merged=new Map<string,Ftd>();for(const file of await recentFiles()){try{const rows=await load(file);for(const [k,v] of rows){const old=merged.get(k);if(!old||v.date>old.date)merged.set(k,v)}}catch{}}return merged}
+async function buildRows(){
+  const merged=new Map<string,Ftd>();
+  const files=await recentFiles();
+  const batches=await Promise.all(files.map(async file=>{try{return await load(file)}catch(e){lastFtdError=e instanceof Error?e.message:"load_failed";return null}}));
+  for(const rows of batches)if(rows)for(const [k,v] of rows){const old=merged.get(k);if(!old||v.date>old.date)merged.set(k,v)}
+  return merged;
+}
 
 export async function getFtd(ticker:string){
   const key=ticker.toUpperCase(),day=new Date().toISOString().slice(0,10),cacheKey=day;
