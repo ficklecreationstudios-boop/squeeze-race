@@ -13,6 +13,7 @@ export async function GET(){
     ctbPlane:"IBorrowDesk fee snapshot",
     borrowAvailabilityPlane:"IBorrowDesk shares-available snapshot",
     ftdPlane:"SEC CNS fails-to-deliver",
+    ftdDiagnostics:getFtdDiagnostics(),
     timestamp:Date.now()
   });
 }
