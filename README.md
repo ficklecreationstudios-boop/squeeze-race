@@ -1,1 +1,47 @@
-# Squeeze Race\n\nA live multi-plane research trigger board for a 20-name squeeze/liquidity watchlist.\n\n## Live data planes\n- Price: Polygon stock snapshot, server-side key.\n- 20-day breakout: highest high from the prior 20 completed daily sessions.\n- Intraday RVOL: current cumulative regular-session volume divided by 20-session average daily volume, normalized by elapsed regular-session time.\n- SI/DTC: Fintel short-interest endpoint; settlement/snapshot data.\n- CTB/shares available: Fintel borrow-rate endpoint.\n- FTD: Fintel fails-to-deliver endpoint; explicitly lagged.\n- Short-volume divergence: actual FINRA Reg SHO Daily Short Sale Volume ratio for the latest trade date minus the mean of the prior up-to-20 FINRA observations; explicitly not short interest. Fintel short-volume is a fallback only when FINRA credentials are absent.\n- Phase audit: browser-persisted transition history with timestamp, price, RVOL and reasons.\n- Alerts: browser Notification API on phase transitions.\n\nFintel documents separate endpoints for short interest, borrow rate/shares available, short volume and fails-to-deliver. FINRA explicitly distinguishes short-sale volume from short-interest positions. SEC documents FTD as aggregate fails outstanding at a settlement date and notes that FTDs can arise from long or short activity. citeturn0search8turn0search4turn2search0\n\n## Environment\nCopy .env.example to .env.local and set:\nPOLYGON_API_KEY=\nFINTEL_API_KEY=\nFINTEL_API_BASE_URL=https://api.fintel.io\nFINRA_CLIENT_ID=\nFINRA_CLIENT_SECRET=\n\nKeys remain server-side only. Never expose them as NEXT_PUBLIC_ variables.\n\nWithout both keys, the app enters DATA-GAP rather than converting sample values into fake live signals.\n\n## Trigger engine\n- FUEL: SI >= 20% AND DTC >= 5.\n- PRE-SQUEEZE: price >= 20-day high AND RVOL >= 2x AND one stress condition: CTB >= 5%, availability <= 500k, FTD >= 1% float, or short-volume divergence >= 5pp.\n- ACTIVE: price >= 20-day high AND RVOL >= 3x AND CTB >= 5% AND one active stress condition: availability <= 250k, CTB >= 10%, FTD >= 1%, or short-volume divergence >= 5pp.\n- INVALIDATED: price <= 95% of 20-day high OR SI < 20%.\n- GYGY LIQUIDITY: market cap < $25M AND RVOL >= 3x AND float turnover >= 25%.\n- DATA-GAP: required fields are unavailable; no positive squeeze state is fabricated.\n\nThese are configurable research rules, not predictions or investment advice.\n\n## Runtime\nBrowser refresh: 10 seconds. Slow structural data cache: 5 minutes. Historical price/volume cache: 60 seconds. The local audit survives reloads through localStorage and stores the newest 500 transitions.\n\n## Verification\nnpm install\nnpm run typecheck\nnpm run build\nnpm run dev\n\nPolygon snapshots expose current trade/quote and day/previous-day aggregates. FINRA publishes periodic equity short-interest data and its Reg SHO Daily Short Sale Volume dataset; FINRA explicitly distinguishes short-sale volume from short-interest positions. SEC FTD data is published twice monthly and represents aggregate fails outstanding as of settlement dates. citeturn0search5turn0search0turn0search4turn2search0
+# Squeeze Race
+
+A live multi-plane research trigger board for a 20-name squeeze/liquidity watchlist.
+
+## Keyless provider mesh
+
+- **Price / intraday volume / historical candles:** Yahoo Finance chart endpoint, with Stooq daily fallback. No API key.
+- **20-day breakout:** highest high from the prior 20 completed daily sessions.
+- **Intraday RVOL:** current regular-session cumulative volume divided by the 20-session average daily volume, normalized by elapsed regular-session time. This replaces the old current-day/previous-day approximation.
+- **Short interest / DTC:** FINRA Consolidated Short Interest public API. SI is bi-monthly settlement data; DTC is recomputed as current short position / FINRA average daily volume.
+- **Short-volume divergence:** FINRA Reg SHO Daily Short Sale Volume public API; latest short-volume percentage minus the mean of the prior up-to-20 observations. FINRA explicitly distinguishes this flow measure from short-interest positions.
+- **Float / market cap:** TradingView public scanner, matching the keyless architecture used by OpenTerminal. OpenTerminal documents a no-key mesh using public Nasdaq/Yahoo/Stooq/TradingView endpoints and warns that these are not execution-grade licensed feeds.
+- **CTB / shares available:** deliberately DATA-GAP. No verified universal keyless per-name live borrow-fee feed is being invented.
+- **FTD:** deliberately DATA-GAP for now. The SEC publishes authoritative CNS FTD files semi-monthly, but this revision does not yet parse the ZIP files. SEC notes FTD can arise from both long and short activity.
+
+## Provenance
+
+Every metric carries source, observation timestamp and freshness. Provider failure produces nulls/DATA-GAP rather than recycled sample values. Missing CTB, availability and FTD cannot create a positive squeeze trigger.
+
+## Trigger engine
+
+- FUEL: SI >= 20% AND DTC >= 5.
+- PRE-SQUEEZE: price >= 20-day high AND RVOL >= 2x AND one stress condition: CTB >= 5%, availability <= 500k, FTD >= 1% float, or short-volume divergence >= 5pp.
+- ACTIVE: price >= 20-day high AND RVOL >= 3x AND CTB >= 5% AND one active stress condition: availability <= 250k, CTB >= 10%, FTD >= 1% float, or short-volume divergence >= 5pp.
+- INVALIDATED: price <= 95% of 20-day high OR SI < 20%.
+- GYGY LIQUIDITY: market cap < $25M AND RVOL >= 3x AND float turnover >= 25%.
+- DATA-GAP: required fields are unavailable; no positive squeeze state is fabricated.
+
+These are configurable research rules, not predictions or investment advice.
+
+## Open-source references
+
+- https://github.com/ErTasselli/OpenTerminal — MIT, zero-key public market-data mesh.
+- https://github.com/guanquann/Stocksera — useful reference for FINRA short volume, SEC FTD and IBKR borrow integrations; its separate API requires a key, so Squeeze Race does not depend on that API.
+
+## Runtime
+
+Browser refresh: 10 seconds. Slow structural data cache: 5 minutes. Historical price/volume cache: 60 seconds. Phase transitions persist in localStorage and can trigger browser notifications.
+
+## Verification
+
+npm install
+npm run typecheck
+npm run build
+npm run dev
+
+No market-data environment variables are required.
