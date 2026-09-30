@@ -17,7 +17,7 @@ async function recentFiles(){
   const r=await fetch("https://www.sec.gov/data-research/sec-markets-data/fails-deliver-data",{headers:{"accept":"text/html","User-Agent":SEC_UA},cache:"no-store"});
   if(!r.ok)throw new Error("SEC FTD index HTTP "+r.status);
   const html=await r.text();
-  const urls=[...html.matchAll(/https?:\\/\\/[^"'\\s<>]+cnsfails\\d{6}[ab]\\.zip/gi)].map(m=>m[0]);
+  const urls=(html.match(/https?:\/\/[^"'\\s<>]+cnsfails\d{6}[ab]\.zip/gi)||[]);
   const files=matches(urls);
   if(!files.length)throw new Error("SEC FTD index contained no ZIP resources");
   return files;
