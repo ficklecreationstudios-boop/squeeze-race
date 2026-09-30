@@ -94,6 +94,6 @@ export async function getFtd(ticker:string){
   const key=ticker.toUpperCase(),day=new Date().toISOString().slice(0,10),cacheKey=day;
   const c=cache.get(cacheKey);if(c&&Date.now()-c.at<86400000)return c.rows.get(key)||await pipeworxFallback(key);
   let p=inflight.get(cacheKey);if(!p){p=buildRows().finally(()=>inflight.delete(cacheKey));inflight.set(cacheKey,p)}
-  const rows=await p;cache.set(cacheKey,{at:Date.now(),rows});return rows.get(key)||await pipeworxFallback(key);
+  try{const rows=await p;cache.set(cacheKey,{at:Date.now(),rows});return rows.get(key)||await pipeworxFallback(key)}catch(e){lastFtdError=e instanceof Error?e.message:"build_failed";return await pipeworxFallback(key)}
 }
 export function getFtdDiagnostics(){return{lastError:lastFtdError,source:"SEC CNS fails-to-deliver primary + keyless fallback"}}
