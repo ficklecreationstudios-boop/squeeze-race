@@ -1,31 +1,4 @@
-import {WATCHLIST} from "./config";
-import {evaluate,Signal} from "./rules";
-const POLYGON="https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers";
-type P=any;
-export async function getMarket():Promise<{signals:Signal[];source:string;timestamp:number;live:boolean;error?:string}>{
- const key=process.env.POLYGON_API_KEY;
- const now=Date.now();
- if(!key){
-   return {signals:WATCHLIST.map(x=>evaluate({...x,price:x.breakout*.88,rvol:1,freshness:"DEMO",updatedAt:now,provider:"demo"})).map((phase,i)=>({...WATCHLIST[i],price:WATCHLIST[i].breakout*.88,rvol:1,phase,updatedAt:now,freshness:"DEMO",provider:"demo"})),source:"demo",timestamp:now,live:false,error:"POLYGON_API_KEY is not configured"};
- }
- try{
-   const symbols=WATCHLIST.map(x=>x.ticker).join(",");
-   const res=await fetch(POLYGON+"?tickers="+encodeURIComponent(symbols)+"&apiKey="+encodeURIComponent(key),{cache:"no-store"});
-   if(!res.ok) throw new Error("Polygon HTTP "+res.status);
-   const json=await res.json();
-   const by=new Map<string,P>(json.tickers?.map((x:P)=>[x.ticker,x])||[]);
-   const signals=WATCHLIST.map(x=>{
-     const p=by.get(x.ticker);
-     const price=Number(p?.lastTrade?.p ?? p?.day?.c ?? x.breakout*.88);
-     const volume=Number(p?.day?.v ?? 0);
-     const prevVolume=Number(p?.prevDay?.v ?? 0);
-     const rvol=prevVolume>0?volume/prevVolume:1;
-     const updated=Number(p?.updated ?? p?.lastTrade?.t ?? now);
-     const base={...x,price,rvol,freshness:p?"LIVE":"MISSING",updatedAt:updated,provider:"polygon"};
-     return {...base,phase:evaluate(base)};
-   });
-   return {signals,source:"Polygon snapshot",timestamp:now,live:true};
- }catch(e){
-   return {signals:WATCHLIST.map(x=>({...x,price:x.breakout*.88,rvol:1,phase:evaluate({...x,price:x.breakout*.88,rvol:1,freshness:"STALE",updatedAt:now,provider:"fallback"}),freshness:"STALE",updatedAt:now,provider:"fallback"})),source:"fallback",timestamp:now,live:false,error:e instanceof Error?e.message:"market provider failed"};
- }
-}
+import {WATCHLIST} from "./config";import {evaluate,Signal} from "./rules";import {get20DayHistory} from "./history";import {getShortBundle} from "./short";
+const POLYGON="https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers";type P=any;const histCache=new Map<string,{at:number;v:Awaited<ReturnType<typeof get20DayHistory>>}>(),shortCache=new Map<string,{at:number;v:Awaited<ReturnType<typeof getShortBundle>>}>();
+async function cachedHistory(t:string){const c=histCache.get(t);if(c&&Date.now()-c.at<60000)return c.v;const v=await get20DayHistory(t);histCache.set(t,{at:Date.now(),v});return v}async function cachedShort(t:string){const c=shortCache.get(t);if(c&&Date.now()-c.at<300000)return c.v;const v=await getShortBundle(t);shortCache.set(t,{at:Date.now(),v});return v}
+export async function getMarket(){const now=Date.now(),key=process.env.POLYGON_API_KEY;if(!key){return{signals:WATCHLIST.map(x=>({ticker:x.ticker,price:null,breakout:null,rvol:null,si:null,dtc:null,ctb:null,avail:null,ftd:null,svd:null,marketCap:null,float:null,floatTurnover:null,phase:"DATA-GAP" as const,freshness:"UNAVAILABLE",updatedAt:now,provider:"not configured",sources:{},reasons:["POLYGON_API_KEY and FINTEL_API_KEY are required"]})),source:"unconfigured",timestamp:now,live:false,error:"Configure POLYGON_API_KEY and FINTEL_API_KEY for full-live mode"}}try{const snap=await fetch(POLYGON+"?tickers="+encodeURIComponent(WATCHLIST.map(x=>x.ticker).join(","))+"&apiKey="+encodeURIComponent(key),{cache:"no-store"});if(!snap.ok)throw new Error("Polygon HTTP "+snap.status);const json=await snap.json(),by=new Map<string,P>((json.tickers||[]).map((x:P)=>[x.ticker,x]));const signals=await Promise.all(WATCHLIST.map(async x=>{const p=by.get(x.ticker),h=await cachedHistory(x.ticker),s=await cachedShort(x.ticker),price=Number(p?.lastTrade?.p??p?.day?.c);const volume=Number(p?.day?.v);const floatTurnover=s.float&&volume?volume/s.float*100:null;const sources={...s.sources,price:{value:Number.isFinite(price)?price:null,source:"Polygon snapshot",observedAt:now,freshness:"LIVE" as const},breakout:{value:h.breakout,source:h.source,observedAt:h.observedAt,freshness:h.freshness},rvol:{value:h.rvol,source:h.source,observedAt:h.observedAt,freshness:h.freshness},floatTurnover:{value:floatTurnover,source:"Polygon day volume / Fintel float",observedAt:now,freshness:"LIVE" as const}};const base={ticker:x.ticker,price:Number.isFinite(price)?price:null,breakout:h.breakout,rvol:h.rvol,si:s.si,dtc:s.dtc,ctb:s.ctb,avail:s.avail,ftd:s.ftd,svd:s.svd,marketCap:s.marketCap,float:s.float,floatTurnover,updatedAt:now,provider:"Polygon + Fintel",freshness:p&&h.freshness==="LIVE"?"LIVE":"PARTIAL",sources};const ev=evaluate(base);return{...base,phase:ev.phase,reasons:ev.reasons}}));return{signals,source:"Polygon + Fintel",timestamp:now,live:signals.every(x=>x.freshness==="LIVE"),error:process.env.FINTEL_API_KEY?undefined:"FINTEL_API_KEY is not configured"}}catch(e){return{signals:WATCHLIST.map(x=>({ticker:x.ticker,price:null,breakout:null,rvol:null,si:null,dtc:null,ctb:null,avail:null,ftd:null,svd:null,marketCap:null,float:null,floatTurnover:null,phase:"DATA-GAP" as const,freshness:"ERROR",updatedAt:now,provider:"error",sources:{},reasons:[e instanceof Error?e.message:"market adapter failed"]})),source:"error",timestamp:now,live:false,error:e instanceof Error?e.message:"market adapter failed"}}}
