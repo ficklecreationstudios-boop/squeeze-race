@@ -25,7 +25,7 @@ async function pageFallback(ticker:string):Promise<Borrow>{
   let last:unknown=null;
   for(const host of hosts){
    try{
-    const r=await fetch(host+encodeURIComponent(ticker.toUpperCase()),{headers:{"accept":"text/html","User-Agent":"Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)"},cache:"no-store"});
+    const r=await timedFetch(host+encodeURIComponent(ticker.toUpperCase()),{headers:{"accept":"text/html","User-Agent":"Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)"},cache:"no-store"});
   if(!r.ok)throw new Error("IBorrowDesk page HTTP "+r.status);
   const text=cleanHtml(await r.text());
   const feeMatch=text.match(/Borrow fee\s+([0-9]+(?:\.[0-9]+)?%)/i);
@@ -46,7 +46,7 @@ export async function getIBorrowDesk(ticker:string,exchange?:string|null):Promis
     const hosts=["https://iborrowdesk.com/api/ticker/","https://www.iborrowdesk.com/api/ticker/"];
     let last:unknown=null;
     for(const host of hosts){try{
-      const r=await fetch(host+encodeURIComponent(ticker.toUpperCase()),{headers:{"accept":"application/json","accept-encoding":"gzip, deflate, br","User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36 Squeeze-Race/1.0"},cache:"no-store"});
+      const r=await timedFetch(host+encodeURIComponent(ticker.toUpperCase()),{headers:{"accept":"application/json","accept-encoding":"gzip, deflate, br","User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36 Squeeze-Race/1.0"},cache:"no-store"});
       if(!r.ok)throw new Error("IBorrowDesk API HTTP "+r.status);
       const j=await r.json() as {real_time?:Array<Record<string,any>>;daily?:Array<Record<string,any>>};
     const rows=[...(j.real_time||[]),...(j.daily||[])].filter(x=>x&&(Number.isFinite(Number(x.fee))||Number.isFinite(Number(x.available))));
