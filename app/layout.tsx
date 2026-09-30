@@ -1,0 +1,1 @@
+import "./globals.css"; export const metadata={title:"Squeeze Race",description:"Mechanical squeeze trigger research board"}; export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body>{children}</body></html>}
