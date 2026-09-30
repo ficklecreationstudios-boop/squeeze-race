@@ -2,8 +2,10 @@ import {getFinraShortInterest,getFinraShortVolume} from "./finra";
 import {getTradingViewFundamentals} from "./tradingview";
 import {getIBorrowDesk} from "./borrow";
 import {getFtd} from "./ftd";
+import {unstable_cache} from "next/cache";
 const BORROW_CACHE_MS=5*60*1000;const borrowCache=new Map<string,{at:number;v:Awaited<ReturnType<typeof getIBorrowDesk>>}>();const borrowInflight=new Map<string,Promise<Awaited<ReturnType<typeof getIBorrowDesk>>>>();
-async function cachedBorrow(ticker:string,exchange?:string|null){const key=ticker.toUpperCase();const c=borrowCache.get(key);if(c&&Date.now()-c.at<BORROW_CACHE_MS)return c.v;const pending=borrowInflight.get(key);if(pending)return pending;const p=getIBorrowDesk(ticker,exchange).finally(()=>borrowInflight.delete(key));borrowInflight.set(key,p);const v=await p;borrowCache.set(key,{at:Date.now(),v});return v}
+const sharedBorrow=(ticker:string,exchange?:string|null)=>unstable_cache(()=>getIBorrowDesk(ticker,exchange),["squeeze-race","borrow",ticker.toUpperCase(),(exchange??"unknown").toLowerCase()],{revalidate:300});
+async function cachedBorrow(ticker:string,exchange?:string|null){const key=ticker.toUpperCase();const c=borrowCache.get(key);if(c&&Date.now()-c.at<BORROW_CACHE_MS)return c.v;const pending=borrowInflight.get(key);if(pending)return pending;const p=sharedBorrow(ticker,exchange)().finally(()=>borrowInflight.delete(key));borrowInflight.set(key,p);const v=await p;borrowCache.set(key,{at:Date.now(),v});return v}
 export type ShortBundle={si:number|null;dtc:number|null;ctb:number|null;avail:number|null;ftd:number|null;svd:number|null;float:number|null;marketCap:number|null;sources:Record<string,{value:number|null;source:string;observedAt:number|null;freshness:"SNAPSHOT"|"LAGGED"|"LIVE"|"UNAVAILABLE"}>};
 export async function getShortBundle(ticker:string):Promise<ShortBundle>{
   const empty=(source:string)=>({value:null,source,observedAt:null,freshness:"UNAVAILABLE" as const});
