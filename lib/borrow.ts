@@ -1,4 +1,4 @@
-type Borrow={fee:number|null;available:number|null;observedAt:number|null;source:string;freshness:"LIVE"|"SNAPSHOT"|"UNAVAILABLE"};
+type Borrow={fee:number|null;available:number|null;observedAt:number|null;source:string;freshness:"LIVE"|"SNAPSHOT"|"LAGGED"|"UNAVAILABLE"};
 function parseCompact(v:string){const n=Number(v.replace(/[$,%]/g,""));if(!Number.isFinite(n))return null;const u=v.trim().toUpperCase();return n*(u.endsWith("M")?1_000_000:u.endsWith("K")?1_000:1)}
 function cleanHtml(s:string){return s.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim()}
 async function pageFallback(ticker:string):Promise<Borrow>{
@@ -15,7 +15,9 @@ async function pageFallback(ticker:string):Promise<Borrow>{
   const fee=feeMatch?parseCompact(feeMatch[1]):null,available=availMatch?parseCompact(availMatch[1]):null;
   if(fee===null&&available===null)throw new Error("IBorrowDesk page values missing");
   const ts=updated?Date.parse(updated[1]):null;
-  return{fee,available,observedAt:Number.isFinite(ts??NaN)?ts:null,source:"IBorrowDesk public report page / Interactive Brokers stock-loan feed",freshness:"SNAPSHOT"};
+  const age=Number.isFinite(ts??NaN)?Date.now()-(ts as number):Number.POSITIVE_INFINITY;
+  const freshness=age<=45*60*1000?"LIVE":age<=24*60*60*1000?"SNAPSHOT":"LAGGED";
+  return{fee,available,observedAt:Number.isFinite(ts??NaN)?ts:null,source:"IBorrowDesk public report page / Interactive Brokers stock-loan feed",freshness};
    }catch(e){last=e}
   }
   throw last||new Error("IBorrowDesk page unavailable");
