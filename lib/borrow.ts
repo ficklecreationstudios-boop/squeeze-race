@@ -8,7 +8,7 @@ async function chartExchangeFallback(ticker:string):Promise<Borrow>{
       const r=await fetch("https://chartexchange.com/symbol/"+exchange+"-"+encodeURIComponent(ticker.toLowerCase())+"/borrow-fee/",{headers:{"accept":"text/html","User-Agent":"Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)"},cache:"no-store"});
       if(!r.ok)throw new Error("ChartExchange HTTP "+r.status);
       const text=cleanHtml(await r.text());
-      const m=text.match(/As of (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} (?:AM|PM) EDT, there were ([0-9,.]+(?:[KM])?) shares available with a fee of ([0-9,.]+)%/i);
+      const m=text.match(/As of ([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} (?:AM|PM) EDT), there were ([0-9,.]+(?:[KM])?) shares available with a fee of ([0-9,.]+)%/i);
       if(!m)throw new Error("ChartExchange borrow values missing");
       const ts=Date.parse(m[1]);
       const observed=Number.isFinite(ts)?ts:Date.now();
