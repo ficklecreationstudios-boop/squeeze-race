@@ -7,7 +7,7 @@ async function recentFiles(){
   const r=await fetch("https://catalog.data.gov/api/3/action/package_show?id=fails-to-deliver-data",{headers:{"accept":"application/json","User-Agent":SEC_UA},cache:"no-store"});
   if(!r.ok)throw new Error("Data.gov FTD catalog HTTP "+r.status);
   const j=await r.json() as {result?:{resources?:Array<{url?:string}>}};
-  const files=(j.result?.resources||[]).map(x=>String(x.url||"")).filter(url=>url.toLowerCase().endsWith(".zip")&&/cnsfails\\d{6}[ab]\\.zip/i.test(url));
+  const files=(j.result?.resources||[]).map(x=>String(x.url||"")).filter(url=>url.toLowerCase().endsWith(".zip")&&/cnsfails\d{6}[ab]\.zip/i.test(url));
   files.sort((a,b)=>b.localeCompare(a));
   return files.slice(0,12);
 }
