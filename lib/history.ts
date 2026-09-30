@@ -1,6 +1,8 @@
 type Bar={t:number;o:number;h:number;l:number;c:number;v:number};
-type YahooChart={chart?:{result?:Array<{timestamp?:number[];indicators?:{quote?:Array<{open?:Array<number|null>;high?:Array<number|null>;low?:Array<number|null>;close?:Array<number|null>;volume?:Array<number|null>}>}>}>}};
-const YF="https://query1.finance.yahoo.com/v8/finance/chart/";const STOOQ="https://stooq.com/q/d/l/";
+type YahooQuote={open?:Array<number|null>;high?:Array<number|null>;low?:Array<number|null>;close?:Array<number|null>;volume?:Array<number|null>};
+type YahooChart={chart?:{result?:Array<{timestamp?:number[];indicators?:{quote?:YahooQuote[]}}>}};
+const YF="https://query1.finance.yahoo.com/v8/finance/chart/";
+const STOOQ="https://stooq.com/q/d/l/";
 function etProgress(now=Date.now()){const p=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour12:false,hour:"2-digit",minute:"2-digit"}).formatToParts(now);const h=Number(p.find(x=>x.type==="hour")?.value||0),m=Number(p.find(x=>x.type==="minute")?.value||0),mins=h*60+m;return Math.max(.05,Math.min(1,(mins-570)/390))}
 async function yahoo(ticker:string,interval:"1d"|"5m",range:string){const u=YF+encodeURIComponent(ticker)+"?interval="+interval+"&range="+range+"&includePrePost=false&events=div%2Csplits";const r=await fetch(u,{cache:"no-store",headers:{"User-Agent":"Squeeze-Race/1.0"}});if(!r.ok)throw new Error("Yahoo chart HTTP "+r.status);return(await r.json()) as YahooChart}
 function bars(j:YahooChart):Bar[]{const x=j.chart?.result?.[0],q=x?.indicators?.quote?.[0],ts=x?.timestamp||[];if(!q)return[];return ts.map((t,i)=>({t:t*1000,o:Number(q.open?.[i]??NaN),h:Number(q.high?.[i]??NaN),l:Number(q.low?.[i]??NaN),c:Number(q.close?.[i]??NaN),v:Number(q.volume?.[i]??0)})).filter(x=>Number.isFinite(x.c)&&Number.isFinite(x.h))}
