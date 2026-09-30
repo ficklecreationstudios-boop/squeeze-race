@@ -1,9 +1,32 @@
 import {unzipSync} from "fflate";
 type Ftd={shares:number|null;date:string;observedAt:number;source:string;freshness:"SNAPSHOT"};
 const cache=new Map<string,{at:number;rows:Map<string,Ftd>}>();
+const fallbackCache=new Map<string,{at:number;row:Ftd|null}>();
 let inflight:Promise<Map<string,Ftd>>|null=null;
 const SEC_UA="Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)";
 function ymd(d:Date){return d.toISOString().slice(0,10)}
+
+function findFtdValue(value:unknown):Ftd|null{
+  if(!value||typeof value!=="object")return null;
+  if(Array.isArray(value)){for(const v of value){const hit=findFtdValue(v);if(hit)return hit}return null}
+  const o=value as Record<string,unknown>;
+  const date=String(o.settlement_date??o.settlementDate??o.date??"");
+  const shares=Number(o.shares_failed??o.failure_to_deliver??o.shares??o.quantity??NaN);
+  if(/^\\d{4}-\\d{2}-\\d{2}$/.test(date)&&Number.isFinite(shares))return{shares,date,observedAt:Date.parse(date),source:"SEC CNS fails-to-deliver data via Pipeworx keyless SEC pack",freshness:"SNAPSHOT"};
+  for(const v of Object.values(o)){const hit=findFtdValue(v);if(hit)return hit}
+  return null;
+}
+async function pipeworxFallback(ticker:string):Promise<Ftd|null>{
+  const key=ticker.toUpperCase(),old=fallbackCache.get(key);
+  if(old&&Date.now()-old.at<86400000)return old.row;
+  try{
+    const r=await fetch("https://gateway.pipeworx.io/v1/tools/ftd_security",{method:"POST",headers:{"content-type":"application/json","accept":"application/json"},body:JSON.stringify({symbol:key,periods:6}),cache:"no-store"});
+    if(!r.ok)throw new Error("Pipeworx FTD HTTP "+r.status);
+    const hit=findFtdValue(await r.json());
+    fallbackCache.set(key,{at:Date.now(),row:hit});
+    return hit;
+  }catch{fallbackCache.set(key,{at:Date.now(),row:null});return null}
+}
 async function recentFiles(){
   const matches=(urls:string[])=>urls.filter(url=>/cnsfails\\d{6}[ab]\\.zip/i.test(url)).filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>b.localeCompare(a)).slice(0,12);
   try{
@@ -61,5 +84,5 @@ export async function getFtd(ticker:string){
   if(!inflight)inflight=buildRows().finally(()=>{inflight=null});
   const rows=await inflight;
   cache.set(key,{at:Date.now(),rows});
-  return rows.get(ticker.toUpperCase())||null;
+  return rows.get(ticker.toUpperCase())||await pipeworxFallback(ticker);
 }
