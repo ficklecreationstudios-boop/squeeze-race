@@ -10,7 +10,7 @@ async function chartExchangeFallback(ticker:string):Promise<Borrow>{
       const text=cleanHtml(await r.text());
       const m=text.match(/As of (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} (?:AM|PM) EDT, there were ([0-9,.]+(?:[KM])?) shares available with a fee of ([0-9,.]+)%/i);
       if(!m)throw new Error("ChartExchange borrow values missing");
-      const ts=Date.parse(m[1]+" "+new Date().getFullYear().toString());
+      const ts=Date.parse(m[1]);
       const observed=Number.isFinite(ts)?ts:Date.now();
       const age=Date.now()-observed;
       return{fee:Number(m[3].replace(/,/g,"")),available:parseCompact(m[2]),observedAt:observed,source:"ChartExchange / Interactive Brokers stock-loan feed",freshness:age<=45*60*1000?"LIVE":age<=24*60*60*1000?"SNAPSHOT":"LAGGED"};
