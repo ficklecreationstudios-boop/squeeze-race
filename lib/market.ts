@@ -20,5 +20,6 @@ export async function getMarket(){
     secFtd:coverage.ftd>0,
     priceHistory:coverage.price>0
   };
-  return{signals:results,source:"keyless public provider mesh",timestamp:now,live:Object.values(providerStatus).every(Boolean),coverage,phaseCounts,providerStatus,error:results.some(x=>x.phase==="DATA-GAP")?"Some required fields remain unavailable; no positive squeeze state is fabricated":undefined}
+  const coverageComplete=fields.every(f=>coverage[f]===results.length);
+  return{signals:results,source:"keyless public provider mesh",timestamp:now,live:true,coverageComplete,coverage,phaseCounts,providerStatus,error:results.some(x=>x.phase==="DATA-GAP")?"Some required fields remain unavailable; no positive squeeze state is fabricated":undefined}
 }

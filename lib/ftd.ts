@@ -4,13 +4,15 @@ const cache=new Map<string,{at:number;rows:Map<string,Ftd>}>();
 const inflight=new Map<string,Promise<Map<string,Ftd>>>();
 const fallbackCache=new Map<string,{at:number;row:Ftd|null}>();
 let lastFtdError:string|null=null;
+let secBlockedUntil=0;
 const SEC_UA="Squeeze-Race/1.0 (+https://github.com/ficklecreationstudios-boop/squeeze-race)";
 const INDEX="https://www.sec.gov/data-research/sec-markets-data/fails-deliver-data";
 const MAX_FILE=60_000_000;
 
 async function recentFiles():Promise<string[]>{
+  if(Date.now()<secBlockedUntil)throw new Error("SEC FTD direct access cooling down after HTTP 403");
   const r=await fetch(INDEX,{headers:{"accept":"text/html","User-Agent":SEC_UA},cache:"no-store"});
-  if(!r.ok){lastFtdError="index_http_"+r.status;throw new Error(lastFtdError)}
+  if(!r.ok){lastFtdError="index_http_"+r.status;if(r.status===403)secBlockedUntil=Date.now()+6*60*60*1000;throw new Error(lastFtdError)}
   const html=await r.text(),out:string[]=[];
   for(const m of html.matchAll(/href="([^"]*cnsfails(\d{6}[ab])\.zip)"/gi)){
     const u=m[1].startsWith("http")?m[1]:"https://www.sec.gov"+m[1];
