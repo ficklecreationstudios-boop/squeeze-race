@@ -1,6 +1,8 @@
 import {WATCHLIST} from "./config";import {evaluate} from "./rules";import {get20DayHistory} from "./history";import {getShortBundle} from "./short";import {getTradingViewFundamentals} from "./tradingview";
 const histCache=new Map<string,{at:number;v:Awaited<ReturnType<typeof get20DayHistory>>}>(),shortCache=new Map<string,{at:number;v:Awaited<ReturnType<typeof getShortBundle>>}>();
-function emptyMetric(source:string){return{value:null,source,observedAt:null,freshness:"UNAVAILABLE" as const}}\nasync function mapLimit<T,R>(items:T[],limit:number,fn:(x:T)=>Promise<R>){const out:R[]=[];let n=0;async function worker(){while(n<items.length){const i=n++;out[i]=await fn(items[i])}}await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out}\nasync function cachedHistory(t:string){const c=histCache.get(t);if(c&&Date.now()-c.at<60000)return c.v;const v=await get20DayHistory(t);histCache.set(t,{at:Date.now(),v});return v}
+function emptyMetric(source:string){return{value:null,source,observedAt:null,freshness:"UNAVAILABLE" as const}}
+async function mapLimit<T,R>(items:T[],limit:number,fn:(x:T)=>Promise<R>){const out:R[]=[];let n=0;async function worker(){while(n<items.length){const i=n++;out[i]=await fn(items[i])}}await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out}
+async function cachedHistory(t:string){const c=histCache.get(t);if(c&&Date.now()-c.at<60000)return c.v;const v=await get20DayHistory(t);histCache.set(t,{at:Date.now(),v});return v}
 async function cachedShort(t:string,tv:Awaited<ReturnType<typeof getTradingViewFundamentals>>){const c=shortCache.get(t);if(c&&Date.now()-c.at<300000)return c.v;const v=await getShortBundle(t,tv);shortCache.set(t,{at:Date.now(),v});return v}
 export async function getMarket(){
   const now=Date.now();let tv:Awaited<ReturnType<typeof getTradingViewFundamentals>>=new Map();try{tv=await getTradingViewFundamentals(WATCHLIST.map(x=>x.ticker))}catch{}
