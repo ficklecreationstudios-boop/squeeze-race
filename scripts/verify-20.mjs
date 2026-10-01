@@ -1,6 +1,7 @@
 const expected=["BBAI","SERV","SOUN","ONDS","WOLF","HTZ","STEM","EQ","MAC","EEFT","WULF","HST","WWW","ESQ","RES","ARR","FDS","GYGY","TMS","PAYS"];
 const base=process.env.SQUEEZE_RACE_BASE_URL||"http://127.0.0.1:3000";
-const r=await fetch(base+"/api/market",{cache:"no-store"});
+const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),20000);
+const r=await fetch(base+"/api/verify-20",{cache:"no-store",signal:controller.signal}).finally(()=>clearTimeout(timeout));
 if(!r.ok)throw new Error("market endpoint HTTP "+r.status);
 const j=await r.json();
 const got=(j.signals||[]).map(x=>x.ticker);
