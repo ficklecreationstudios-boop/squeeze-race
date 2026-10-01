@@ -7,6 +7,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      BORROW_PROVIDER: mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,11 +17,14 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm run build
-      - name: Runtime smoke test
+      - name: Runtime and 20-symbol acceptance test
         run: |
           npm run start > /tmp/squeeze-race.log 2>&1 &
           pid=$!
           trap 'kill $pid || true' EXIT
-          for i in {1..30}; do curl -fsS http://127.0.0.1:3000/api/health && exit 0; sleep 1; done
-          cat /tmp/squeeze-race.log
-          exit 1
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/api/health; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3000/api/health > /dev/null
+          npm run verify:20
