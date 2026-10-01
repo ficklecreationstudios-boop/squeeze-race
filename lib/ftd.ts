@@ -86,7 +86,7 @@ async function pipeworxFallback(ticker:string):Promise<Ftd|null>{
 }
 async function buildRows(){
   const merged=new Map<string,Ftd>();
-  const files=await recentFiles();
+  const files=(await recentFiles()).slice(0,2);
   const batches=await Promise.all(files.map(async file=>{try{return await load(file)}catch(e){lastFtdError=e instanceof Error?e.message:"load_failed";return null}}));
   for(const rows of batches)if(rows)for(const [k,v] of rows){const old=merged.get(k);if(!old||v.date>old.date)merged.set(k,v)}
   return merged;

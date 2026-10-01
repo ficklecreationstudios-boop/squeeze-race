@@ -16,6 +16,7 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run typecheck
+      - run: npm run test:rules
       - run: npm run build
       - name: Runtime and 20-symbol acceptance test
         run: |
@@ -28,3 +29,4 @@ jobs:
           done
           curl -fsS http://127.0.0.1:3000/api/health > /dev/null
           npm run verify:20
+          npm run verify:security
