@@ -9,5 +9,5 @@ if(j.symbolCount!==20||j.expectedSymbolCount!==20)throw new Error(`symbol-count 
 if(JSON.stringify(got)!==JSON.stringify(expected))throw new Error("20-symbol order/set gate failed: "+got.join(","));
 if(j.borrowProvider!=="MOCK_IBKR")throw new Error("borrow provenance gate failed: expected MOCK_IBKR, got "+j.borrowProvider);
 if(j.live!==false)throw new Error("live-status gate failed: mock provider must never be reported as live");
-for(const row of j.signals){if(row.ctb===null||row.avail===null)throw new Error(`${row.ticker}: missing simulated CTB/availability`);const source=String(row.sources?.ctb?.source||"");if(!source.includes("MOCK_IBKR"))throw new Error(`${row.ticker}: borrow source is not MOCK_IBKR`);if(row.sources?.ctb?.freshness!=="SNAPSHOT")throw new Error(`${row.ticker}: simulated borrow freshness is not SNAPSHOT`);}
+for(const row of j.signals){if(row.ctb===null||row.avail===null)throw new Error(`${row.ticker}: missing simulated CTB/availability`);const source=String(row.source||"");if(!source.includes("MOCK_IBKR"))throw new Error(`${row.ticker}: borrow source is not MOCK_IBKR`);if(row.freshness!=="SNAPSHOT")throw new Error(`${row.ticker}: simulated borrow freshness is not SNAPSHOT`);}
 console.log(JSON.stringify({gate:"20-symbol-borrow",status:"PASS",symbols:20,borrowProvider:j.borrowProvider,live:j.live,allBorrowValuesPresent:true}));
