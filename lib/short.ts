@@ -5,10 +5,10 @@ import {getFtd} from "./ftd";
 import {unstable_cache} from "next/cache";
 const BORROW_CACHE_MS=5*60*1000;const borrowCache=new Map<string,{at:number;v:Awaited<ReturnType<typeof getIBorrowDesk>>}>();const borrowInflight=new Map<string,Promise<Awaited<ReturnType<typeof getIBorrowDesk>>>>();
 async function cachedBorrow(ticker:string,exchange?:string|null){const key=ticker.toUpperCase();const c=borrowCache.get(key);if(c&&Date.now()-c.at<BORROW_CACHE_MS)return c.v;const pending=borrowInflight.get(key);if(pending)return pending;const p=getIBorrowDesk(ticker,exchange).finally(()=>borrowInflight.delete(key));borrowInflight.set(key,p);const v=await p; if(v.freshness!=="UNAVAILABLE")borrowCache.set(key,{at:Date.now(),v}); return v}
-export type ShortBundle={si:number|null;dtc:number|null;ctb:number|null;avail:number|null;ftd:number|null;svd:number|null;float:number|null;marketCap:number|null;sources:Record<string,{value:number|null;source:string;observedAt:number|null;freshness:"SNAPSHOT"|"LAGGED"|"LIVE"|"UNAVAILABLE"}>};
+export type ShortBundle={si:number|null;dtc:number|null;ctb:number|null;avail:number|null;ftd:number|null;svd:number|null;float:number|null;marketCap:number|null;price:number|null;volume:number|null;sources:Record<string,{value:number|null;source:string;observedAt:number|null;freshness:"SNAPSHOT"|"LAGGED"|"LIVE"|"UNAVAILABLE"}>};
 export async function getShortBundle(ticker:string):Promise<ShortBundle>{
   const empty=(source:string)=>({value:null,source,observedAt:null,freshness:"UNAVAILABLE" as const});
-  const out:ShortBundle={si:null,dtc:null,ctb:null,avail:null,ftd:null,svd:null,float:null,marketCap:null,sources:{
+  const out:ShortBundle={si:null,dtc:null,ctb:null,avail:null,ftd:null,svd:null,float:null,marketCap:null,price:null,volume:null,sources:{
     si:empty("FINRA Consolidated Short Interest"),dtc:empty("FINRA Consolidated Short Interest"),
     ctb:empty("IBorrowDesk / Interactive Brokers public stock-loan feed"),
     avail:empty("IBorrowDesk / Interactive Brokers public stock-loan feed"),
@@ -43,6 +43,6 @@ export async function getShortBundle(ticker:string):Promise<ShortBundle>{
     out.ftd=ftd.shares/f.float*100;
     out.sources.ftd={value:out.ftd,source:ftd.source+" ("+Math.round(ftd.shares).toLocaleString()+" shares on "+ftd.date+")",observedAt:ftd.observedAt,freshness:ftd.freshness};
   }
-  if(f){out.float=f.float;out.marketCap=f.marketCap;out.sources.float={value:f.float,source:f.source,observedAt:f.observedAt,freshness:f.freshness};out.sources.marketCap={value:f.marketCap,source:f.source,observedAt:f.observedAt,freshness:f.freshness}}
+  if(f){out.float=f.float;out.marketCap=f.marketCap;out.price=f.price;out.volume=f.volume;out.sources.float={value:f.float,source:f.source,observedAt:f.observedAt,freshness:f.freshness};out.sources.marketCap={value:f.marketCap,source:f.source,observedAt:f.observedAt,freshness:f.freshness}}
   return out;
 }
