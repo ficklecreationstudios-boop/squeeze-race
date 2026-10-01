@@ -4,14 +4,14 @@ export const dynamic="force-dynamic";
 export async function GET(){
   return NextResponse.json({
     ok:true,
-    mode:"keyless-public-provider-mesh",
+    mode:"controlled-provider-mesh",
     pricePlane:"Yahoo Finance chart + Stooq fallback",
     shortInterestPlane:"FINRA Consolidated Short Interest (bi-monthly snapshot)",
     shortVolumePlane:"FINRA Reg SHO Daily Short Sale Volume",
     fundamentalsPlane:"TradingView public scanner",
-    borrowPlane:"IBorrowDesk / Interactive Brokers public stock-loan feed",
-    ctbPlane:"IBorrowDesk fee snapshot",
-    borrowAvailabilityPlane:"IBorrowDesk shares-available snapshot",
+    borrowPlane:"MOCK_IBKR deterministic simulator (no live account connected)",
+    ctbPlane:"MOCK_IBKR fee snapshot",
+    borrowAvailabilityPlane:"MOCK_IBKR shares-available snapshot",
     ftdPlane:"SEC CNS fails-to-deliver",
     ftdDiagnostics:getFtdDiagnostics(),
     timestamp:Date.now()
