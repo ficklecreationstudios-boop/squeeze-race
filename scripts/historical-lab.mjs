@@ -62,8 +62,7 @@ function candidateSettlementDates(year){
 }
 
 function parseFinraCsv(text){
-  const lines=text.split(/\r?
-/).filter(Boolean);
+  const lines=text.split(/\r?\n/).filter(Boolean);
   if(!lines.length)return [];
   const header=lines[0].split("|").map(x=>x.trim().replace(/^"|"$/g,""));
   const idx=new Map(header.map((x,i)=>[x,i]));
