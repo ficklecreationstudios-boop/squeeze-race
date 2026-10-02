@@ -207,18 +207,27 @@ function fitLogistic(train,label){
 }
 function predict(model,r){return sigmoid(model[0]+r.x.reduce((s,x,j)=>s+model[j+1]*x,0));}
 
-function isotonicFit(items){
-  const a=items.map(x=>({p:x.p,y:x.y,n:1,sum:x.y})).sort((a,b)=>a.p-b.p);
-  const blocks=[];
-  for(const z of a){
-    blocks.push(z);
-    while(blocks.length>1){
-      const q=blocks[blocks.length-2], r=blocks[blocks.length-1];
-      if(q.sum/q.n<=r.sum/r.n)break;
-      blocks.splice(blocks.length-2,2,{p:(q.p*q.n+r.p*r.n)/(q.n+r.n),y:0,n:q.n+r.n,sum:q.sum+r.sum});
+function isotonicBlocks(blocks){
+  const out=[];
+  for(const z of blocks){
+    out.push({...z});
+    while(out.length>1){
+      const a=out[out.length-2], b=out[out.length-1];
+      if(a.sum/a.n<=b.sum/b.n)break;
+      out.splice(out.length-2,2,{p:(a.p*a.n+b.p*b.n)/(a.n+b.n),n:a.n+b.n,sum:a.sum+b.sum});
     }
   }
-  return blocks;
+  return out;
+}
+function calibrationFit(items,bins=20){
+  const a=items.map(x=>({p:x.p,y:x.y})).sort((a,b)=>a.p-b.p);
+  const raw=[];
+  const size=Math.ceil(a.length/bins);
+  for(let i=0;i<a.length;i+=size){
+    const g=a.slice(i,i+size);
+    raw.push({p:mean(g.map(x=>x.p)),n:g.length,sum:g.reduce((s,x)=>s+x.y,0)});
+  }
+  return isotonicBlocks(raw);
 }
 function isoPredict(blocks,p){
   if(!blocks.length)return p;
@@ -226,15 +235,6 @@ function isoPredict(blocks,p){
   if(p>=blocks.at(-1).p)return blocks.at(-1).sum/blocks.at(-1).n;
   for(let i=1;i<blocks.length;i++)if(p<=blocks[i].p)return blocks[i-1].sum/blocks[i-1].n;
   return p;
-}
-function brier(pred,ys){return mean(pred.map((p,i)=>(p-ys[i])**2));}
-function topDecileLift(pred,ys){const n=Math.max(1,Math.floor(pred.length*.10));const idx=pred.map((p,i)=>[p,i]).sort((a,b)=>b[0]-a[0]).slice(0,n).map(x=>x[1]);const rate=mean(idx.map(i=>ys[i]));const base=mean(ys);return {eventRate:rate,lift:base?rate/base:null};}
-function logloss(pred,ys){return -mean(pred.map((p,i)=>ys[i]?Math.log(Math.max(p,1e-9)):Math.log(Math.max(1-p,1e-9))));}
-function auc(pred,ys){
-  const pairs=pred.map((p,i)=>[p,ys[i]]).sort((a,b)=>a[0]-b[0]);
-  let pos=0,neg=0,rank=0,rankPos=0;
-  for(const [,y] of pairs){if(y){pos++;rankPos+=rank+1}else neg++;rank++;}
-  return pos&&neg?(rankPos-pos*(pos+1)/2)/(pos*neg):null;
 }
 function evaluate(test,label,model,stats,calibration){
   const x=standardize([],[]); // no-op; test is already standardized below
@@ -284,7 +284,7 @@ async function main(){
   for(const label of ["explosiveMove","shortSupported","sustained"]){
     const model=fitLogistic(trainStd,label);
     const calPred=calStd.map(r=>predict(model,r));
-    const calibration=isotonicFit(calStd.map((r,i)=>({p:calPred[i],y:r.outcomes[label]?1:0})));
+    const calibration=calibrationFit(calStd.map((r,i)=>({p:calPred[i],y:r.outcomes[label]?1:0})));
     const calibrationEvents=calStd.filter(r=>r.outcomes[label]).length;
     result.labels[label]={trainEvents:trainStd.filter(r=>r.outcomes[label]).length,calibrationEvents,test:evaluate(testStd,label,model,null,calibration)};
     result.models[label]={featureNames:FEATURE_NAMES,weights:model,standardization:stats,calibrationBlocks:calibration.map(b=>({p:b.p,n:b.n,sum:b.sum}))};
