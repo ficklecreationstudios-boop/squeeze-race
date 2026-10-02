@@ -30,6 +30,7 @@ jobs:
           done
           curl -fsS http://127.0.0.1:3000/api/health > /dev/null
           npm run verify:20
+          npm run verify:realtime
           npm run verify:security
           npm run backtest:proxy
           npm run backtest:rules
