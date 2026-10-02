@@ -18,9 +18,9 @@ export async function GET(request:NextRequest){
       plane:"REALTIME_TECHNICAL",
       symbolCount:signals.length,
       expectedSymbolCount:symbols.length,
-      interval:"public-quote-poll",
+      interval:"1m",
       source:"Yahoo Finance chart (keyless)",
-      liveObservationDefinition:"Fast plane is polled every 5 seconds from a batched public quote scanner. The scanner does not expose a reliable per-quote observation timestamp, so freshness remains SNAPSHOT; retrievedAt is the application poll time.",
+      liveObservationDefinition:"LIVE means the latest 1-minute regular-session bar is <= 2 minutes old; source timestamps are retained.",
       signals,
       retrievedAt:Date.now()
     },{headers:{"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
