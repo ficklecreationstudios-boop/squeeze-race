@@ -11,7 +11,8 @@
     "verify:20": "node scripts/verify-20.mjs",
     "verify:security": "node scripts/verify-security.mjs",
     "backtest:proxy": "node scripts/backtest-proxy.mjs",
-    "historical:lab": "node scripts/historical-lab.mjs"
+    "historical:lab": "node scripts/historical-lab.mjs",
+    "backtest:rules": "node scripts/rule-backtest.mjs"
   },
   "dependencies": {
     "next": "16.3.8",
