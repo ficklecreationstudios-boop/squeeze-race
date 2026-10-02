@@ -20,6 +20,12 @@ async function main(){const si=await loadSI(),all=[];for(const ticker of TICKERS
 const groups=["FUEL","MONITOR","INVALIDATED","LIQUIDITY"];const summary={samples:all.length,years:YEARS,byPhase:{},nonCausal:true,lookaheadGuard:"FINRA settlement + 7 calendar days",label:"future 10-trading-day max high >=20% from signal close"};
 for(const g of groups){const a=all.filter(x=>x.phase===g),events=a.filter(x=>x.outcome20).length,rate=a.length?events/a.length:null;summary.byPhase[g]={samples:a.length,events,rate,lift:null,medianForward5:a.length?([...a.map(x=>x.ret5)].sort((a,b)=>a-b)[Math.floor(a.length/2)]):null,medianMax10:a.length?([...a.map(x=>x.max10)].sort((a,b)=>a-b)[Math.floor(a.length/2)]):null}}
 const base=all.length?all.filter(x=>x.outcome20).length/all.length:null;for(const g of groups)if(summary.byPhase[g].rate!==null&&base)summary.byPhase[g].lift=summary.byPhase[g].rate/base;
-summary.baseRate=base;summary.gates={enoughSamples:all.length>=5000,enoughFuelEvents:summary.byPhase.FUEL.events>=MIN_EVENTS,enoughMonitorEvents:summary.byPhase.MONITOR.events>=MIN_EVENTS,noLookahead:true,nonCausalLabel:true};
+summary.baseRate=base;
+summary.interpretation={
+  fuelVsBase:summary.byPhase.FUEL.lift,
+  monitorVsBase:summary.byPhase.MONITOR.lift,
+  note:"A lift below 1.0 means the phase had a lower rate of future 10-trading-day +20% max-high events than the unconditional sample base rate; this is descriptive, not causal."
+};
+summary.gates={enoughSamples:all.length>=5000,enoughFuelEvents:summary.byPhase.FUEL.events>=MIN_EVENTS,enoughMonitorEvents:summary.byPhase.MONITOR.events>=MIN_EVENTS,noLookahead:true,nonCausalLabel:true,diagnosticOnly:true};
 fs.mkdirSync("artifacts",{recursive:true});fs.writeFileSync("artifacts/rule-backtest-latest.json",JSON.stringify(summary,null,2)+"\n");console.log(JSON.stringify(summary,null,2));if(!summary.gates.enoughSamples||!summary.gates.enoughFuelEvents||!summary.gates.enoughMonitorEvents)throw new Error("Rule backtest gate failed: insufficient aligned event evidence");}
 main().catch(e=>{console.error(e.stack||e);process.exit(1)});
