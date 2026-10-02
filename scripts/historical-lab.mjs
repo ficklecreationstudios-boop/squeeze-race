@@ -156,8 +156,8 @@ function makeRows(ticker,bars,reports,marketByDate){
     // shortSupported = explosive move + elevated pre-event short pressure.
     // Neither label proves causal short covering.
     const explosiveMove=forward5>=0.20;
-    const shortSupported=forward5>=0.10 && short.dtc!==null && short.dtc>=3 && rvol>=2 && breakoutDistance>=-0.01 && momentum5>=0;
-    const sustained=shortSupported && forward10>=0.15 && maxDrawdown>-0.20;
+    const shortSupported=forward5>=0.05 && short.dtc!==null && short.dtc>=3 && rvol>=2 && breakoutDistance>=-0.01 && momentum5>=0;
+    const sustained=shortSupported && forward10>=0.10 && maxDrawdown>-0.20;
     const featureValues=[short.dtc,short.siChangePct??0,rvol,momentum5,breakoutDistance,volumeAcceleration,rangeCompression,dollarVolumeLog,market.momentum20,market.vol20];
     if(!featureValues.every(Number.isFinite))continue;
     rows.push({
