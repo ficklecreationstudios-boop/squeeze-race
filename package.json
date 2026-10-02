@@ -13,7 +13,8 @@
     "backtest:proxy": "node scripts/backtest-proxy.mjs",
     "historical:lab": "node scripts/historical-lab.mjs",
     "backtest:rules": "node scripts/rule-backtest.mjs",
-    "tune:fuel": "node scripts/tune-fuel-thresholds.mjs"
+    "tune:fuel": "node scripts/tune-fuel-thresholds.mjs",
+    "verify:realtime": "node scripts/verify-realtime.mjs"
   },
   "dependencies": {
     "next": "16.3.8",
