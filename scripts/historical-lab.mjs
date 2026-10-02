@@ -236,6 +236,10 @@ function isoPredict(blocks,p){
   for(let i=1;i<blocks.length;i++)if(p<=blocks[i].p)return blocks[i-1].sum/blocks[i-1].n;
   return p;
 }
+function brier(pred,ys){return mean(pred.map((p,i)=>(p-ys[i])**2));}
+function logloss(pred,ys){return -mean(pred.map((p,i)=>ys[i]?Math.log(Math.max(p,1e-9)):Math.log(Math.max(1-p,1e-9))));}
+function auc(pred,ys){const pairs=pred.map((p,i)=>[p,ys[i]]).sort((a,b)=>a[0]-b[0]);let pos=0,neg=0,rank=0,rankPos=0;for(const [,y] of pairs){if(y){pos++;rankPos+=rank+1}else neg++;rank++;}return pos&&neg?(rankPos-pos*(pos+1)/2)/(pos*neg):null;}
+function topDecileLift(pred,ys){const n=Math.max(1,Math.floor(pred.length*.10));const idx=pred.map((p,i)=>[p,i]).sort((a,b)=>b[0]-a[0]).slice(0,n).map(x=>x[1]);const rate=mean(idx.map(i=>ys[i]));const base=mean(ys);return {eventRate:rate,lift:base?rate/base:null};}
 function evaluate(test,label,model,stats,calibration){
   const x=standardize([],[]); // no-op; test is already standardized below
   const raw=test.map(r=>predict(model,r));
