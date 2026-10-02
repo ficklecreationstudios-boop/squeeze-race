@@ -75,3 +75,24 @@ export async function getFinraShortVolume(ticker:string){
   const latestRatio=ratios[0].ratio,prior=ratios.slice(1);
   return{svd:prior.length?latestRatio-prior.reduce((a,b)=>a+b.ratio,0)/prior.length:null,latestShortVolumePct:latestRatio,observedAt:Date.parse(ratios[0].date),source:"FINRA Reg SHO Daily Short Sale Volume",freshness:"SNAPSHOT" as const};
 }
+
+export async function getHistoricalShortInterest(ticker:string,limit=12){
+  const dates=await latestPartitions("consolidatedShortInterest");
+  const out:{date:string;sharesShort:number;adv:number|null;dtc:number|null;source:string}[]=[];
+  for(const date of dates.slice(0,Math.min(Math.max(limit,1),24))){
+    const rows=await post("consolidatedShortInterest",{limit:5,fields:["settlementDate","symbolCode","currentShortPositionQuantity","averageDailyVolumeQuantity","daysToCoverQuantity"],compareFilters:[{compareType:"EQUAL",fieldName:"settlementDate",fieldValue:date},{compareType:"EQUAL",fieldName:"symbolCode",fieldValue:ticker}]});
+    const x=rows[0],shares=num(x?.currentShortPositionQuantity);if(shares===null)continue;
+    const adv=num(x?.averageDailyVolumeQuantity),dtc=num(x?.daysToCoverQuantity)??(adv&&adv>0?shares/adv:null);
+    out.push({date:String(x.settlementDate||date),sharesShort:shares,adv,dtc,source:"FINRA Consolidated Short Interest"});
+  }
+  return out;
+}
+
+export async function getHistoricalShortVolume(ticker:string,days=60){
+  const dates=await latestPartitions("regShoDaily"); if(!dates.length)return [];
+  const latest=dates[0],start=new Date(Date.parse(latest)-Math.min(Math.max(days,1),120)*86400000).toISOString().slice(0,10);
+  const rows=await post("regShoDaily",{limit:5000,fields:["tradeReportDate","securitiesInformationProcessorSymbolIdentifier","shortParQuantity","shortExemptParQuantity","totalParQuantity"],compareFilters:[{compareType:"EQUAL",fieldName:"securitiesInformationProcessorSymbolIdentifier",fieldValue:ticker}],dateRangeFilters:[{startDate:start,endDate:latest,fieldName:"tradeReportDate"}]});
+  const by=new Map<string,{short:number;total:number}>();
+  for(const x of rows){const d=String(x.tradeReportDate||""),s=num(x.shortParQuantity)||0,t=num(x.totalParQuantity)||0;if(!d||t<=0)continue;const v=by.get(d)||{short:0,total:0};v.short+=s;v.total+=t;by.set(d,v);}
+  return [...by.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,v])=>({date,shortVolumePct:v.total?v.short/v.total*100:null,source:"FINRA Reg SHO Daily Short Sale Volume"})).filter(x=>x.shortVolumePct!==null).slice(-Math.min(Math.max(days,1),120)) as {date:string;shortVolumePct:number;source:string}[];
+}
