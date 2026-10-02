@@ -176,7 +176,7 @@ function makeRows(ticker,bars,reports,marketByDate){
 }
 
 const FEATURE_NAMES=["dtc","siChangePct","rvol","momentum5","breakoutDistance","volumeAcceleration","rangeCompression","dollarVolumeLog","marketMomentum20","marketVol20"];
-function standardize(train,rows){
+function fitStats(train){
   const stats={};
   for(const f of FEATURE_NAMES){
     const a=train.map(r=>r.features[f]).filter(Number.isFinite);
@@ -184,6 +184,10 @@ function standardize(train,rows){
     const sd=Math.sqrt(mean(a.map(x=>(x-m)**2))||1)||1;
     stats[f]={m,sd};
   }
+  return stats;
+}
+function standardize(train,rows){
+  const stats=fitStats(train);
   return rows.map(r=>({...r,x:FEATURE_NAMES.map(f=>(r.features[f]-stats[f].m)/stats[f].sd)}));
 }
 function fitLogistic(train,label){
@@ -272,14 +276,18 @@ async function main(){
   const dates=[...new Set(rows.map(r=>r.date))];
   const d1=dates[Math.floor(dates.length*.60)], d2=dates[Math.floor(dates.length*.80)];
   const train=rows.filter(r=>r.date<d1),cal=rows.filter(r=>r.date>=d1&&r.date<d2),test=rows.filter(r=>r.date>=d2);
-  const trainStd=standardize(train,train),calStd=standardize(train,cal),testStd=standardize(train,test);
+  const stats=fitStats(train);
+  const standardizeWithStats=rows=>rows.map(r=>({...r,x:FEATURE_NAMES.map(f=>(r.features[f]-stats[f].m)/stats[f].sd)}));
+  const trainStd=standardizeWithStats(train),calStd=standardizeWithStats(cal),testStd=standardizeWithStats(test);
   const result={dataset:{samples:rows.length,tickers:activeTickers.length,dateStart:dates[0],dateEnd:dates.at(-1),train:train.length,calibration:cal.length,test:test.length,universeBias:"FINRA-derived historical universe capped by SQUEEZE_LAB_UNIVERSE_SIZE; Yahoo survivorship/availability bias remains"},labels:{}};
+  result.models={};
   for(const label of ["explosiveMove","shortSupported","sustained"]){
     const model=fitLogistic(trainStd,label);
     const calPred=calStd.map(r=>predict(model,r));
     const calibration=isotonicFit(calStd.map((r,i)=>({p:calPred[i],y:r.outcomes[label]?1:0})));
     const calibrationEvents=calStd.filter(r=>r.outcomes[label]).length;
     result.labels[label]={trainEvents:trainStd.filter(r=>r.outcomes[label]).length,calibrationEvents,test:evaluate(testStd,label,model,null,calibration)};
+    result.models[label]={featureNames:FEATURE_NAMES,weights:model,standardization:stats,calibrationBlocks:calibration.map(b=>({p:b.p,n:b.n,sum:b.sum}))};
   }
   result.gates={
     minimumSamples:rows.length>=MIN_SAMPLES,
