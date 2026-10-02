@@ -6,7 +6,7 @@ export function evaluate(r:Omit<Signal,"phase"|"reasons">):{phase:Phase;reasons:
   if(r.price===null||r.breakout===null||r.rvol===null||r.si===null||r.dtc===null)return{phase:"DATA-GAP",reasons:["required live structural fields are unavailable"]};
   if(r.si<20)return{phase:"INVALIDATED",reasons:["SI < 20%"]};
 
-  const borrowOk=(x:number|null,f?:string)=>x!==null&&f!=="LAGGED"&&f!=="UNAVAILABLE";
+  const borrowOk=(x:number|null,f?:string)=>r.borrowTrusted!==false&&x!==null&&f!=="LAGGED"&&f!=="UNAVAILABLE";
   const stress=(borrowOk(r.ctb,r.ctbFreshness)&&r.ctb!>=5)||(borrowOk(r.avail,r.availFreshness)&&r.avail!<=500000)||(r.ftd!==null&&r.ftd>=1)||(r.svd!==null&&r.svd>=5);
   const activeStress=(borrowOk(r.avail,r.availFreshness)&&r.avail!<=250000)||(borrowOk(r.ctb,r.ctbFreshness)&&r.ctb!>=10)||(r.ftd!==null&&r.ftd>=1)||(r.svd!==null&&r.svd>=5);
 
