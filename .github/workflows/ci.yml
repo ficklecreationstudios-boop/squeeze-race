@@ -32,3 +32,20 @@ jobs:
           npm run verify:20
           npm run verify:security
           npm run backtest:proxy
+  historical-lab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Build leakage-safe historical dataset and calibrated models
+        run: npm run historical:lab
+      - name: Upload historical calibration audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-squeeze-lab
+          path: artifacts/historical-lab-latest.json
+          if-no-files-found: ignore
