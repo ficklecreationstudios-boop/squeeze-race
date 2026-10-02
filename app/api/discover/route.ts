@@ -1,0 +1,3 @@
+import {discoverCandidates} from "@/lib/discovery";
+export const runtime="nodejs"; export const dynamic="force-dynamic";
+export async function GET(req:Request){try{const u=new URL(req.url),limit=Math.min(Math.max(Number(u.searchParams.get("limit")||100),25),200),candidates=await discoverCandidates(limit);return Response.json({universeType:"EXPANDED_PUBLIC_SCAN",count:candidates.length,limit,source:"TradingView public scanner",live:false,observedAt:new Date().toISOString(),candidates},{headers:{"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});}catch(e){return Response.json({universeType:"EXPANDED_PUBLIC_SCAN",count:0,candidates:[],error:e instanceof Error?e.message:"discovery failed"},{status:503,headers:{"Cache-Control":"no-store"}});}}
