@@ -1,0 +1,5 @@
+import {getMarket} from "@/lib/market";
+import {WATCHLIST} from "@/lib/config";
+export const runtime="nodejs"; export const dynamic="force-dynamic";
+const valid=(s:string)=>/^[A-Z][A-Z0-9.-]{0,9}$/.test(s);
+export async function GET(req:Request){const u=new URL(req.url),raw=u.searchParams.get("symbols")||"",symbols=[...new Set(raw.split(",").map(x=>x.trim().toUpperCase()).filter(valid))];if(!symbols.length)return Response.json({error:"provide symbols=AAA,BBB",example:"/api/scan?symbols=BBAI,SOUN"}, {status:400});if(symbols.length>30)return Response.json({error:"maximum 30 symbols per expanded scan"}, {status:400});try{const data=await getMarket(symbols);return Response.json({...data,universeType:"EXPANDED_USER_SELECTED",fixedAcceptanceSet:WATCHLIST.map(x=>x.ticker),symbolCount:symbols.length},{headers:{"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});}catch(e){return Response.json({error:e instanceof Error?e.message:"scan failed"}, {status:503,headers:{"Cache-Control":"no-store"}});}}
