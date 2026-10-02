@@ -4,7 +4,7 @@ export const dynamic="force-dynamic";
 export const runtime="nodejs";
 export async function GET(){
   const response=NextResponse.json({
-    ok:true,mode:"controlled-provider-mesh",framework:"Next.js 15.5.27",
+    ok:true,mode:"controlled-provider-mesh",framework:"Next.js 16.3.8",
     pricePlane:"Yahoo Finance chart + Stooq fallback",
     shortInterestPlane:"FINRA Consolidated Short Interest (bi-monthly snapshot)",
     shortVolumePlane:"FINRA Reg SHO Daily Short Sale Volume",
