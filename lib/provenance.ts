@@ -18,6 +18,7 @@ export type CollectionRun = {
 
 export const PROVENANCE_VERSION = "provenance-v1";
 export const UNIVERSE_VERSION = "squeeze20-v1";
+export const EXPANDED_UNIVERSE_VERSION = "expanded-public-v1";
 export const RULE_VERSION = "squeeze-rules-v1";
 
 export function makeRunId(startedAt = new Date()) {
@@ -30,8 +31,8 @@ export function makeObservation<T>(runId:string,symbol:string,field:string,value
   return {observationId:stableId([runId,symbol,field,meta.observedAt??"null",String(value)]),runId,symbol,field,value,...meta};
 }
 export function codeVersion(){return process.env.VERCEL_GIT_COMMIT_SHA||process.env.GIT_COMMIT_SHA||"local";}
-export function startRun(symbolCount:number,startedAt=new Date()):CollectionRun{
-  return {runId:makeRunId(startedAt),startedAt:startedAt.toISOString(),finishedAt:"",codeVersion:codeVersion(),universeVersion:UNIVERSE_VERSION,ruleVersion:RULE_VERSION,status:"PARTIAL",symbolCount,observationCount:0};
+export function startRun(symbolCount:number,universeVersion=UNIVERSE_VERSION,startedAt=new Date()):CollectionRun{
+  return {runId:makeRunId(startedAt),startedAt:startedAt.toISOString(),finishedAt:"",codeVersion:codeVersion(),universeVersion,ruleVersion:RULE_VERSION,status:"PARTIAL",symbolCount,observationCount:0};
 }
 export function finishRun(run:CollectionRun,observationCount:number,status:CollectionRun["status"]):CollectionRun{
   return {...run,finishedAt:new Date().toISOString(),observationCount,status};
