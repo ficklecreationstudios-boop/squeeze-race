@@ -18,7 +18,7 @@ export async function getShortBundle(ticker:string,tv?:Map<string,{price:number|
  const f=tv?.get(ticker)??null;const borrow=await cachedBorrow(ticker,f?.exchange??null).catch(()=>null);
  if(si){
   out.dtc=si.dtc;out.siChangePct=si.shortChangePct??null;out.sources.dtc={value:si.dtc,source:si.source+" (recomputed from current short / FINRA ADV)",observedAt:si.observedAt,freshness:si.freshness};
-  if(si.sharesShort!==null&&f?.float&&f.float>0){const raw=si.sharesShort/f.float*100;out.siRaw=raw;if(raw>100){out.si=null;out.siQuality="ANOMALOUS_RATIO";out.sources.si={value:raw,source:si.source+" + TradingView float (anomalous SI/float ratio; excluded from classification)",observedAt:si.observedAt,freshness:"SNAPSHOT"}}else{out.si=raw;out.siQuality="OK";out.sources.si={value:raw,source:si.source+" + TradingView float",observedAt:Math.min(si.observedAt,f.observedAt),freshness:"SNAPSHOT"}}}
+  if(si.sharesShort!==null&&f?.float&&f.float>0){const raw=si.sharesShort/f.float*100;out.siRaw=raw;if(raw>100){out.si=null;out.siQuality="ANOMALOUS_RATIO";out.sources.si={value:raw,source:si.source+" + TradingView float (anomalous SI/float ratio; excluded from classification)",observedAt:si.observedAt,freshness:"SNAPSHOT"}}else{out.si=raw;out.siQuality="OK";out.sources.si={value:raw,source:si.source+" + TradingView float",observedAt:si.observedAt,freshness:"SNAPSHOT"}}}
   else out.sources.si={value:si.sharesShort,source:si.source+" (shares; float denominator separate)",observedAt:si.observedAt,freshness:si.freshness};
  }
  if(sv){out.svd=sv.svd;out.sources.svd={value:sv.svd,source:sv.source,observedAt:sv.observedAt,freshness:sv.freshness}}
