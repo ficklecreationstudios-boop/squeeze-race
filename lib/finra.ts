@@ -47,7 +47,10 @@ export async function getFinraShortInterest(ticker:string){
     const x=rows[0];
     if(!x)continue;
     const sharesShort=num(x.currentShortPositionQuantity),adv=num(x.averageDailyVolumeQuantity);
-    return{sharesShort,dtc:sharesShort!==null&&adv&&adv>0?sharesShort/adv:null,settlementDate:String(x.settlementDate||date),observedAt:Date.parse(String(x.settlementDate||date)),source:"FINRA Consolidated Short Interest",freshness:"SNAPSHOT" as const};
+    let previousShort:null|number=null,previousDate:null|string=null;
+    for(const priorDate of dates.slice(1,4)){const pr=await post("consolidatedShortInterest",{limit:5,fields:["settlementDate","symbolCode","currentShortPositionQuantity"],compareFilters:[{compareType:"EQUAL",fieldName:"settlementDate",fieldValue:priorDate},{compareType:"EQUAL",fieldName:"symbolCode",fieldValue:ticker}]});if(pr[0]){previousShort=num(pr[0].currentShortPositionQuantity);previousDate=String(pr[0].settlementDate||priorDate);break}}
+    const shortChangePct=sharesShort!==null&&previousShort!==null&&previousShort>0?(sharesShort/previousShort-1)*100:null;
+    return{sharesShort,previousShort,shortChangePct,previousDate,dtc:sharesShort!==null&&adv&&adv>0?sharesShort/adv:null,settlementDate:String(x.settlementDate||date),observedAt:Date.parse(String(x.settlementDate||date)),source:"FINRA Consolidated Short Interest",freshness:"SNAPSHOT" as const};
   }
   return null;
 }
