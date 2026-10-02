@@ -21,6 +21,7 @@ const TICKERS = ["BBAI","SERV","SOUN","ONDS","WOLF","HTZ","STEM","EQ","MAC","EEF
 const YEARS = Number(process.env.SQUEEZE_LAB_YEARS || 5);
 const MIN_SAMPLES = Number(process.env.SQUEEZE_LAB_MIN_SAMPLES || 5000);
 const MIN_TEST_EVENTS = Number(process.env.SQUEEZE_LAB_MIN_TEST_EVENTS || 50);
+const UNIVERSE_SIZE = Number(process.env.SQUEEZE_LAB_UNIVERSE_SIZE || 100);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const clamp = (x,a,b) => Math.max(a, Math.min(b,x));
@@ -68,6 +69,7 @@ function parseFinraCsv(text){
   const idx=new Map(header.map((x,i)=>[x,i]));
   const find=(...names)=>{for(const n of names){if(idx.has(n))return idx.get(n)}return -1};
   const sym=find("symbolCode","issueSymbolIdentifier","Symbol");
+  const marketIdx=find("marketClassCode","Market");
   const settle=find("settlementDate","Settlement Date");
   const short=find("currentShortPositionQuantity","currentShortShareNumber","Current Short");
   const prev=find("previousShortPositionQuantity","previousShortShareNumber","Previous Short");
@@ -78,13 +80,13 @@ function parseFinraCsv(text){
   for(let i=1;i<lines.length;i++){
     const p=lines[i].split("|");
     const ticker=(p[sym]||"").trim().toUpperCase();
-    if(!TICKERS.includes(ticker))continue;
+    if(!/^[A-Z]{1,5}$/.test(ticker))continue;
     const settlement=(p[settle]||"").trim().slice(0,10);
     const current=Number(p[short]), previous=prev>=0?Number(p[prev]):NaN;
     const days=dtc>=0?Number(p[dtc]):NaN;
     const change=chg>=0?Number(p[chg]):(Number.isFinite(previous)&&previous?((current/previous)-1)*100:NaN);
     if(!settlement || !Number.isFinite(current))continue;
-    rows.push({ticker,settlement,short:current,dtc:Number.isFinite(days)?days:null,siChangePct:Number.isFinite(change)?change:null});
+    rows.push({ticker,settlement,market:marketIdx>=0?(p[marketIdx]||"").trim():null,short:current,dtc:Number.isFinite(days)?days:null,siChangePct:Number.isFinite(change)?change:null});
   }
   return rows;
 }
@@ -102,8 +104,8 @@ async function loadShortInterest(){
     });
     for(const rows of results)all.push(...rows);
   }
-  const byTicker=new Map(TICKERS.map(t=>[t,[]]));
-  for(const r of all)byTicker.get(r.ticker).push(r);
+  const byTicker=new Map();
+  for(const r of all){if(!byTicker.has(r.ticker))byTicker.set(r.ticker,[]);byTicker.get(r.ticker).push(r);}
   for(const a of byTicker.values())a.sort((x,y)=>x.settlement.localeCompare(y.settlement));
   return byTicker;
 }
@@ -248,8 +250,10 @@ async function mapLimit(items,limit,fn){
 }
 
 async function main(){
-  console.log(JSON.stringify({stage:"historical-lab",years:YEARS,tickers:TICKERS.length,status:"loading public data"},null,2));
+  console.log(JSON.stringify({stage:"historical-lab",years:YEARS,requestedUniverse:UNIVERSE_SIZE,status:"loading public data"},null,2));
   const short=await loadShortInterest();
+  const ranked=[...short.entries()].filter(([t,a])=>a.length>=30 && a.some(r=>r.market && r.market!=="S")).sort((a,b)=>b[1].length-a[1].length).map(([t])=>t);
+  const activeTickers=[...new Set([...TICKERS,...ranked])].slice(0,Math.max(TICKERS.length,UNIVERSE_SIZE));
   const marketBars=await loadBars("SPY");
   const marketByDate=new Map();
   for(let i=20;i<marketBars.length;i++){
@@ -260,7 +264,7 @@ async function main(){
     const vol=Math.sqrt(mean(returns.map(r=>r*r))||0)*Math.sqrt(252);
     marketByDate.set(marketBars[i-1].date,{momentum20,vol20:vol});
   }
-  const bars=await mapLimit(TICKERS,4,async t=>{try{return[t,await loadBars(t)]}catch(e){console.error("YAHOO_SKIP",t,String(e));return[t,[]]}});
+  const bars=await mapLimit(activeTickers,6,async t=>{try{return[t,await loadBars(t)]}catch(e){console.error("YAHOO_SKIP",t,String(e));return[t,[]]}});
   const rows=bars.flatMap(([t,b])=>makeRows(t,b,short.get(t)||[],marketByDate));
   if(rows.length<MIN_SAMPLES)throw new Error("Historical lab gate failed: only "+rows.length+" aligned samples; need >= "+MIN_SAMPLES);
   rows.sort((a,b)=>a.date.localeCompare(b.date));
@@ -268,7 +272,7 @@ async function main(){
   const d1=dates[Math.floor(dates.length*.60)], d2=dates[Math.floor(dates.length*.80)];
   const train=rows.filter(r=>r.date<d1),cal=rows.filter(r=>r.date>=d1&&r.date<d2),test=rows.filter(r=>r.date>=d2);
   const trainStd=standardize(train,train),calStd=standardize(train,cal),testStd=standardize(train,test);
-  const result={dataset:{samples:rows.length,tickers:TICKERS.length,dateStart:dates[0],dateEnd:dates.at(-1),train:train.length,calibration:cal.length,test:test.length,universeBias:"current 20-symbol watchlist; survivorship bias remains; not a market-wide training universe"},labels:{}};
+  const result={dataset:{samples:rows.length,tickers:activeTickers.length,dateStart:dates[0],dateEnd:dates.at(-1),train:train.length,calibration:cal.length,test:test.length,universeBias:"FINRA-derived historical universe capped by SQUEEZE_LAB_UNIVERSE_SIZE; Yahoo survivorship/availability bias remains"},labels:{}};
   for(const label of ["explosiveMove","shortSupported","sustained"]){
     const model=fitLogistic(trainStd,label);
     const calPred=calStd.map(r=>predict(model,r));
