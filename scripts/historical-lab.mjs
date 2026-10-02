@@ -125,7 +125,7 @@ function latestShortBefore(reports, obsDate){
   return best;
 }
 
-function makeRows(ticker,bars,reports){
+function makeRows(ticker,bars,reports,marketByDate){
   const rows=[];
   for(let i=25;i<bars.length-10;i++){
     const b=bars[i-1], w20=bars.slice(i-21,i-1), w5=bars.slice(i-6,i-1), f5=bars.slice(i,i+5), f10=bars.slice(i,i+10);
@@ -169,7 +169,7 @@ function makeRows(ticker,bars,reports){
   return rows;
 }
 
-const FEATURE_NAMES=["dtc","siChangePct","rvol","momentum5","breakoutDistance","volumeAcceleration","rangeCompression"];
+const FEATURE_NAMES=["dtc","siChangePct","rvol","momentum5","breakoutDistance","volumeAcceleration","rangeCompression","dollarVolumeLog","marketMomentum20","marketVol20"];
 function standardize(train,rows){
   const stats={};
   for(const f of FEATURE_NAMES){
@@ -259,11 +259,11 @@ async function main(){
     const model=fitLogistic(trainStd,label);
     const calPred=calStd.map(r=>predict(model,r));
     const calibration=isotonicFit(calStd.map((r,i)=>({p:calPred[i],y:r.outcomes[label]?1:0})));
-    result.labels[label]={trainEvents:trainStd.filter(r=>r.outcomes[label]).length,calibrationEvents:calStd.filter(r=>r.outcomes[label]).length,test:evaluate(testStd,label,model,null,calibration)};
+    const calibrationEvents=calStd.filter(r=>r.outcomes[label]).length;\n    result.labels[label]={trainEvents:trainStd.filter(r=>r.outcomes[label]).length,calibrationEvents,test:evaluate(testStd,label,model,null,calibration)};
   }
   result.gates={
     minimumSamples:rows.length>=MIN_SAMPLES,
-    minimumTestEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].test.events>=MIN_TEST_EVENTS),
+    minimumTestEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].test.events>=MIN_TEST_EVENTS),\n    minimumCalibrationEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].calibrationEvents>=MIN_TEST_EVENTS),
     noLookahead:true,
     probabilitiesCalibratedOnValidationOnly:true,
     borrowSource:"No historical IBKR borrow; MOCK_IBKR is excluded from training evidence"
@@ -271,6 +271,6 @@ async function main(){
   fs.mkdirSync("artifacts",{recursive:true});
   fs.writeFileSync("artifacts/historical-lab-latest.json",JSON.stringify(result,null,2)+"\n");
   console.log(JSON.stringify(result,null,2));
-  if(!result.gates.minimumTestEvents)throw new Error("Historical lab gate failed: insufficient positive test events");
+  if(!result.gates.minimumTestEvents || !result.gates.minimumCalibrationEvents)throw new Error("Historical lab gate failed: insufficient positive events for calibration/test");
 }
 main().catch(e=>{console.error("HISTORICAL_LAB_FAIL",e.stack||e);process.exit(1)});
