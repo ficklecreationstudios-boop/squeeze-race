@@ -15,6 +15,8 @@
  * We conservatively require settlementDate + 7 calendar days <= observationDate
  * before a report can become a feature. This prevents publication look-ahead.
  */
+import fs from "node:fs";
+
 const TICKERS = ["BBAI","SERV","SOUN","ONDS","WOLF","HTZ","STEM","EQ","MAC","EEFT","WULF","HST","WWW","ESQ","RES","ARR","FDS","GYGY","TMS","PAYS"];
 const YEARS = Number(process.env.SQUEEZE_LAB_YEARS || 5);
 const MIN_SAMPLES = Number(process.env.SQUEEZE_LAB_MIN_SAMPLES || 5000);
@@ -266,6 +268,8 @@ async function main(){
     probabilitiesCalibratedOnValidationOnly:true,
     borrowSource:"No historical IBKR borrow; MOCK_IBKR is excluded from training evidence"
   };
+  fs.mkdirSync("artifacts",{recursive:true});
+  fs.writeFileSync("artifacts/historical-lab-latest.json",JSON.stringify(result,null,2)+"\n");
   console.log(JSON.stringify(result,null,2));
   if(!result.gates.minimumTestEvents)throw new Error("Historical lab gate failed: insufficient positive test events");
 }
