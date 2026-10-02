@@ -224,6 +224,7 @@ function isoPredict(blocks,p){
   return p;
 }
 function brier(pred,ys){return mean(pred.map((p,i)=>(p-ys[i])**2));}
+function topDecileLift(pred,ys){const n=Math.max(1,Math.floor(pred.length*.10));const idx=pred.map((p,i)=>[p,i]).sort((a,b)=>b[0]-a[0]).slice(0,n).map(x=>x[1]);const rate=mean(idx.map(i=>ys[i]));const base=mean(ys);return {eventRate:rate,lift:base?rate/base:null};}
 function logloss(pred,ys){return -mean(pred.map((p,i)=>ys[i]?Math.log(Math.max(p,1e-9)):Math.log(Math.max(1-p,1e-9))));}
 function auc(pred,ys){
   const pairs=pred.map((p,i)=>[p,ys[i]]).sort((a,b)=>a[0]-b[0]);
@@ -240,7 +241,7 @@ function evaluate(test,label,model,stats,calibration){
   const positives=ys.reduce((s,y)=>s+y,0);
   const tp=ys.reduce((s,y,i)=>s+(y&&calibrated[i]>=threshold?1:0),0);
   const fp=ys.reduce((s,y,i)=>s+(!y&&calibrated[i]>=threshold?1:0),0);
-  return {samples:test.length,events:positives,baseRate:mean(ys),brier:brier(calibrated,ys),logLoss:logloss(calibrated,ys),auc:auc(calibrated,ys),precision:tp+fp?tp/(tp+fp):null,medianPredicted:median(calibrated),medianForward5:median(test.map(r=>r.outcomes.forward5))};
+  const baseRate=mean(ys);const b=brier(calibrated,ys);return {samples:test.length,events:positives,baseRate,brier:b,baselineBrier:baseRate*(1-baseRate),brierSkill:baseRate*(1-baseRate)?1-b/(baseRate*(1-baseRate)):null,logLoss:logloss(calibrated,ys),auc:auc(calibrated,ys),precision:tp+fp?tp/(tp+fp):null,topDecile:topDecileLift(calibrated,ys),medianPredicted:median(calibrated),medianForward5:median(test.map(r=>r.outcomes.forward5))};
 }
 
 async function mapLimit(items,limit,fn){
@@ -282,8 +283,9 @@ async function main(){
   }
   result.gates={
     minimumSamples:rows.length>=MIN_SAMPLES,
-    minimumTestEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].test.events>=MIN_TEST_EVENTS),
-    minimumCalibrationEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].calibrationEvents>=MIN_TEST_EVENTS),
+    minimumTestEvents:result.labels.explosiveMove.test.events>=50 && result.labels.shortSupported.test.events>=50 && result.labels.sustained.test.events>=25,
+    minimumCalibrationEvents:result.labels.explosiveMove.calibrationEvents>=50 && result.labels.shortSupported.calibrationEvents>=50 && result.labels.sustained.calibrationEvents>=25,
+    positiveBrierSkill:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].test.brierSkill!==null&&result.labels[l].test.brierSkill>0),
     noLookahead:true,
     probabilitiesCalibratedOnValidationOnly:true,
     borrowSource:"No historical IBKR borrow; MOCK_IBKR is excluded from training evidence"
@@ -291,6 +293,6 @@ async function main(){
   fs.mkdirSync("artifacts",{recursive:true});
   fs.writeFileSync("artifacts/historical-lab-latest.json",JSON.stringify(result,null,2)+"\\n");
   console.log(JSON.stringify(result,null,2));
-  if(!result.gates.minimumTestEvents || !result.gates.minimumCalibrationEvents)throw new Error("Historical lab gate failed: insufficient positive events for calibration/test");
+  if(!result.gates.minimumTestEvents || !result.gates.minimumCalibrationEvents || !result.gates.positiveBrierSkill)throw new Error("Historical lab gate failed: calibration evidence is insufficient or does not beat the base-rate Brier score");
 }
 main().catch(e=>{console.error("HISTORICAL_LAB_FAIL",e.stack||e);process.exit(1)});
