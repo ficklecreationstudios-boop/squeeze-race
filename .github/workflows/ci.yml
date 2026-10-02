@@ -32,6 +32,8 @@ jobs:
           npm run verify:20
           npm run verify:security
           npm run backtest:proxy
+          npm run backtest:rules
+          npm run tune:fuel
   historical-lab:
     runs-on: ubuntu-latest
     steps:
