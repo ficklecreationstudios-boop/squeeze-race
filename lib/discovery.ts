@@ -1,11 +1,11 @@
 type ScanRow={s?:string;d?:unknown[]};
-const URL="https://scanner.tradingview.com/global/scan"; const TIMEOUT_MS=8000;
+const URL="https://scanner.tradingview.com/america/scan"; const TIMEOUT_MS=8000;
 export type Candidate={ticker:string;exchange:string|null;price:number|null;volume:number|null;marketCap:number|null;float:number|null;relativeVolume:number|null;source:string;observedAt:number};
 
 async function scan(body:unknown){const c=new AbortController(),timer=setTimeout(()=>c.abort(),TIMEOUT_MS);try{const r=await fetch(URL,{method:"POST",headers:{"content-type":"application/json","accept":"application/json","User-Agent":"Squeeze-Race/1.0"},body:JSON.stringify(body),cache:"no-store",signal:c.signal});if(!r.ok)throw new Error("TradingView scanner HTTP "+r.status);return await r.json();}finally{clearTimeout(timer);}}
 export async function discoverCandidates(limit=100):Promise<Candidate[]>{
   const j=await scan({filter:[
-    {left:"market_cap_basic",operation:"greater",right:10000000},
+    {left:"market_cap_basic",operation:"greater",right:10000000},{left:"type",operation:"in_range",right:["stock"]},{left:"subtype",operation:"in_range",right:["common","foreign-issuer"]},{left:"exchange",operation:"in_range",right:["NASDAQ","NYSE","AMEX"]},
     {left:"market_cap_basic",operation:"less",right:5000000000},
     {left:"close",operation:"greater",right:1},
     {left:"volume",operation:"greater",right:100000}
