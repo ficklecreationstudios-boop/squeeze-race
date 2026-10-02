@@ -272,8 +272,7 @@ async function main(){
     borrowSource:"No historical IBKR borrow; MOCK_IBKR is excluded from training evidence"
   };
   fs.mkdirSync("artifacts",{recursive:true});
-  fs.writeFileSync("artifacts/historical-lab-latest.json",JSON.stringify(result,null,2)+"
-");
+  fs.writeFileSync("artifacts/historical-lab-latest.json",JSON.stringify(result,null,2)+"\\n");
   console.log(JSON.stringify(result,null,2));
   if(!result.gates.minimumTestEvents || !result.gates.minimumCalibrationEvents)throw new Error("Historical lab gate failed: insufficient positive events for calibration/test");
 }
