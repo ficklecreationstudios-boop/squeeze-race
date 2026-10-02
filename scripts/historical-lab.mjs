@@ -62,7 +62,8 @@ function candidateSettlementDates(year){
 }
 
 function parseFinraCsv(text){
-  const lines=text.split(/\r?\n/).filter(Boolean);
+  const lines=text.split(/\r?
+/).filter(Boolean);
   if(!lines.length)return [];
   const header=lines[0].split("|").map(x=>x.trim().replace(/^"|"$/g,""));
   const idx=new Map(header.map((x,i)=>[x,i]));
@@ -259,17 +260,20 @@ async function main(){
     const model=fitLogistic(trainStd,label);
     const calPred=calStd.map(r=>predict(model,r));
     const calibration=isotonicFit(calStd.map((r,i)=>({p:calPred[i],y:r.outcomes[label]?1:0})));
-    const calibrationEvents=calStd.filter(r=>r.outcomes[label]).length;\n    result.labels[label]={trainEvents:trainStd.filter(r=>r.outcomes[label]).length,calibrationEvents,test:evaluate(testStd,label,model,null,calibration)};
+    const calibrationEvents=calStd.filter(r=>r.outcomes[label]).length;
+    result.labels[label]={trainEvents:trainStd.filter(r=>r.outcomes[label]).length,calibrationEvents,test:evaluate(testStd,label,model,null,calibration)};
   }
   result.gates={
     minimumSamples:rows.length>=MIN_SAMPLES,
-    minimumTestEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].test.events>=MIN_TEST_EVENTS),\n    minimumCalibrationEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].calibrationEvents>=MIN_TEST_EVENTS),
+    minimumTestEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].test.events>=MIN_TEST_EVENTS),
+    minimumCalibrationEvents:["explosiveMove","shortSupported","sustained"].every(l=>result.labels[l].calibrationEvents>=MIN_TEST_EVENTS),
     noLookahead:true,
     probabilitiesCalibratedOnValidationOnly:true,
     borrowSource:"No historical IBKR borrow; MOCK_IBKR is excluded from training evidence"
   };
   fs.mkdirSync("artifacts",{recursive:true});
-  fs.writeFileSync("artifacts/historical-lab-latest.json",JSON.stringify(result,null,2)+"\n");
+  fs.writeFileSync("artifacts/historical-lab-latest.json",JSON.stringify(result,null,2)+"
+");
   console.log(JSON.stringify(result,null,2));
   if(!result.gates.minimumTestEvents || !result.gates.minimumCalibrationEvents)throw new Error("Historical lab gate failed: insufficient positive events for calibration/test");
 }
