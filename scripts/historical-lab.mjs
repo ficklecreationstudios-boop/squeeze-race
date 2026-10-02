@@ -145,20 +145,24 @@ function makeRows(ticker,bars,reports,marketByDate){
     const maxDrawdown=trough/b.c-1;
     const peakRvol=Math.max(...f5.map(x=>x.v))/avgVol;
     const short=latestShortBefore(reports,b.date);
-    if(!short)continue;
+    const market=marketByDate.get(b.date);
+    if(!short || !market)continue;
+    const dollarVolumeLog=Math.log10(Math.max(1,b.c*avgVol));
 
     // Event labels are intentionally distinct:
     // explosiveMove = price/volume outcome only.
     // shortSupported = explosive move + elevated pre-event short pressure.
     // Neither label proves causal short covering.
     const explosiveMove=forward5>=0.20;
-    const shortSupported=explosiveMove && short.dtc!==null && short.dtc>=3 && rvol>=2 && breakoutDistance>=-0.01 && momentum5>=0;
-    const sustained=shortSupported && forward10>=0.25 && maxDrawdown>-0.20;
+    const shortSupported=forward5>=0.10 && short.dtc!==null && short.dtc>=3 && rvol>=2 && breakoutDistance>=-0.01 && momentum5>=0;
+    const sustained=shortSupported && forward10>=0.15 && maxDrawdown>-0.20;
+    const featureValues=[short.dtc,short.siChangePct??0,rvol,momentum5,breakoutDistance,volumeAcceleration,rangeCompression,dollarVolumeLog,market.momentum20,market.vol20];
+    if(!featureValues.every(Number.isFinite))continue;
     rows.push({
       ticker,date:b.date,
       features:{
         dtc:short.dtc,siChangePct:short.siChangePct??0,
-        rvol,momentum5,breakoutDistance,volumeAcceleration,rangeCompression
+        rvol,momentum5,breakoutDistance,volumeAcceleration,rangeCompression,dollarVolumeLog,marketMomentum20:market.momentum20,marketVol20:market.vol20
       },
       outcomes:{
         explosiveMove,shortSupported,sustained,
@@ -246,8 +250,18 @@ async function mapLimit(items,limit,fn){
 async function main(){
   console.log(JSON.stringify({stage:"historical-lab",years:YEARS,tickers:TICKERS.length,status:"loading public data"},null,2));
   const short=await loadShortInterest();
+  const marketBars=await loadBars("SPY");
+  const marketByDate=new Map();
+  for(let i=20;i<marketBars.length;i++){
+    const w=marketBars.slice(i-20,i), c=marketBars[i-1].c;
+    const momentum20=c/w[0].c-1;
+    const returns=[];
+    for(let k=1;k<w.length;k++)returns.push(Math.log(w[k].c/w[k-1].c));
+    const vol=Math.sqrt(mean(returns.map(r=>r*r))||0)*Math.sqrt(252);
+    marketByDate.set(marketBars[i-1].date,{momentum20,vol20:vol});
+  }
   const bars=await mapLimit(TICKERS,4,async t=>{try{return[t,await loadBars(t)]}catch(e){console.error("YAHOO_SKIP",t,String(e));return[t,[]]}});
-  const rows=bars.flatMap(([t,b])=>makeRows(t,b,short.get(t)||[]));
+  const rows=bars.flatMap(([t,b])=>makeRows(t,b,short.get(t)||[],marketByDate));
   if(rows.length<MIN_SAMPLES)throw new Error("Historical lab gate failed: only "+rows.length+" aligned samples; need >= "+MIN_SAMPLES);
   rows.sort((a,b)=>a.date.localeCompare(b.date));
   const dates=[...new Set(rows.map(r=>r.date))];
