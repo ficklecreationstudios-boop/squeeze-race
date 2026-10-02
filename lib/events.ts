@@ -1,6 +1,7 @@
+import {getHistoricalShortInterest,getHistoricalShortVolume} from "./finra";
 type Bar={date:string;open:number;high:number;low:number;close:number;volume:number};
 type EventEvidence={field:string;value:number|string;source:string;observedAt:string;freshness:"LIVE"|"SNAPSHOT"};
-export type HistoricalEvent={eventId:string;symbol:string;eventType:"BREAKOUT"|"VOLUME_EXPANSION"|"PRICE_ACCELERATION";eventDate:string;ruleVersion:string;status:"DETECTED";evidence:EventEvidence[];outcome?:{forward1d:number|null;forward5d:number|null;forward10d:number|null;maxFavorable10d:number|null;maxAdverse10d:number|null}};
+export type HistoricalEvent={eventId:string;symbol:string;eventType:"BREAKOUT"|"VOLUME_EXPANSION"|"PRICE_ACCELERATION"|"SHORT_INTEREST_CHANGE"|"SHORT_VOLUME_SPIKE";eventDate:string;ruleVersion:string;status:"DETECTED";evidence:EventEvidence[];outcome?:{forward1d:number|null;forward5d:number|null;forward10d:number|null;maxFavorable10d:number|null;maxAdverse10d:number|null}};
 
 async function loadDaily(ticker:string,years=3):Promise<Bar[]>{
   const p1=Math.floor(Date.now()/1000)-years*366*86400,u="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(ticker)+"?interval=1d&period1="+p1+"&period2="+Math.floor(Date.now()/1000)+"&includePrePost=false&events=div%2Csplits",c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);
