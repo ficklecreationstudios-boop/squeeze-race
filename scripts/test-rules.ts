@@ -1,7 +1,7 @@
 import {evaluate} from "../lib/rules";import {scorePressure} from "../lib/pressure";
 const base:any={ticker:"TEST",price:100,breakout:100,rvol:3,si:25,dtc:7,ctb:8,avail:200000,ftd:1.2,svd:6,ctbFreshness:"SNAPSHOT",availFreshness:"SNAPSHOT",ftdFreshness:"SNAPSHOT",marketCap:100,float:1000000,floatTurnover:30,updatedAt:Date.now(),provider:"test",freshness:"MIXED",sources:{}};
 function expectCase(name:string,ok:boolean){if(!ok)throw new Error("FAIL: "+name);console.log("PASS: "+name)}
-expectCase("active requires breakout, RVOL, CTB and stress",evaluate(base).phase==="ACTIVE");
+expectCase("active requires breakout, RVOL, CTB and stress",evaluate(base).phase==="ACTIVE");expectCase("mock borrow cannot manufacture active phase",evaluate({...base,borrowTrusted:false}).phase!=="ACTIVE");
 expectCase("sub-2x volume is not pre-squeeze",evaluate({...base,rvol:1.99}).phase==="FUEL");
 expectCase("SI below 20 invalidates",evaluate({...base,si:19.99}).phase==="INVALIDATED");
 expectCase("DTC below 5 is monitor",evaluate({...base,dtc:4.99,price:80,rvol:1}).phase==="MONITOR");
